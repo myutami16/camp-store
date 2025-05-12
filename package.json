@@ -12,6 +12,7 @@
 	},
 	"name": "camping-store-backend",
 	"version": "1.0.0",
+	"description": "Backend REST API untuk toko perlengkapan camping",
 	"main": "index.js",
 	"directories": {
 		"lib": "lib"
@@ -24,9 +25,16 @@
 		"dev": "vercel dev",
 		"start": "vercel dev"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": [
+		"camping",
+		"ecommerce",
+		"api",
+		"serverless"
+	],
+	"author": "Adzra Camp",
 	"license": "ISC",
-	"description": "",
-	"type": "module"
+	"type": "module",
+	"engines": {
+		"node": ">=18.0.0"
+	}
 }
