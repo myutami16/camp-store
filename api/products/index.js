@@ -1,4 +1,3 @@
-import { createRouter } from "next/router";
 import multer from "multer";
 import connectDB from "../../lib/db.js";
 import { authMiddleware, roleCheck } from "../../lib/auth.js";
@@ -25,9 +24,6 @@ const upload = multer({
 	},
 });
 
-// Router setup
-const router = createRouter();
-
 // Helper function to upload image to Cloudinary
 const uploadToCloudinary = async (file) => {
 	try {
@@ -51,8 +47,8 @@ const uploadToCloudinary = async (file) => {
 	}
 };
 
-// GET /api/products - Public route to get all products
-router.get(async (req, res) => {
+// This is the handler for GET /api/products - Public route to get all products
+export const getAllProducts = async (req, res) => {
 	try {
 		await connectDB();
 
@@ -87,14 +83,14 @@ router.get(async (req, res) => {
 			message: "Terjadi kesalahan pada server",
 		});
 	}
-});
+};
 
 // GET /api/products/:id - Public route to get a specific product
-router.get("/:id", async (req, res) => {
+export const getProductById = async (req, res) => {
 	try {
 		await connectDB();
 
-		const product = await Product.findById(req.params.id);
+		const product = await Product.findById(req.query.id);
 
 		if (!product) {
 			return res.status(404).json({
@@ -114,257 +110,40 @@ router.get("/:id", async (req, res) => {
 			message: "Terjadi kesalahan pada server",
 		});
 	}
-});
+};
 
-// POST /api/products - Admin only route to create a product
-router.post(async (req, res) => {
-	try {
-		// Authenticate admin
-		await authMiddleware(req, res);
-		if (res.statusCode === 401 || res.statusCode === 403) return;
+// Main handler function for API routes
+export default async function handler(req, res) {
+	// Set CORS headers
+	res.setHeader("Access-Control-Allow-Credentials", true);
+	res.setHeader("Access-Control-Allow-Origin", "*");
+	res.setHeader(
+		"Access-Control-Allow-Methods",
+		"GET,OPTIONS,PATCH,DELETE,POST,PUT"
+	);
+	res.setHeader(
+		"Access-Control-Allow-Headers",
+		"X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+	);
 
-		// Check admin role
-		await roleCheck(["admin", "super_admin"])(req, res);
-		if (res.statusCode === 403) return;
+	if (req.method === "OPTIONS") {
+		res.status(200).end();
+		return;
+	}
 
-		await connectDB();
-
-		// Handle file upload using multer
-		upload.single("gambar")(req, res, async (err) => {
-			if (err) {
-				return res.status(400).json({
-					success: false,
-					message: err.message,
-				});
-			}
-
-			// Validate required fields
-			const {
-				namaProduk,
-				deskripsi,
-				harga,
-				stok,
-				isForRent,
-				isForSale,
-				kategori,
-			} = req.body;
-
-			if (!namaProduk || !deskripsi || !harga || !stok || !kategori) {
-				return res.status(400).json({
-					success: false,
-					message: "Semua field wajib diisi",
-				});
-			}
-
-			// Validate that either isForRent or isForSale is true
-			if (isForRent === "false" && isForSale === "false") {
-				return res.status(400).json({
-					success: false,
-					message: "Produk harus bisa disewa atau dijual",
-				});
-			}
-
-			// Validate image is uploaded
-			if (!req.file) {
-				return res.status(400).json({
-					success: false,
-					message: "Gambar produk wajib diupload",
-				});
-			}
-
-			try {
-				// Upload image to Cloudinary
-				const { url, public_id } = await uploadToCloudinary(req.file);
-
-				// Create new product
-				const product = await Product.create({
-					namaProduk,
-					deskripsi,
-					harga: Number(harga),
-					stok: Number(stok),
-					isForRent: isForRent === "true",
-					isForSale: isForSale === "true",
-					kategori,
-					gambar: url,
-					cloudinary_id: public_id,
-				});
-
-				return res.status(201).json({
-					success: true,
-					data: product,
-				});
-			} catch (uploadError) {
-				console.error("Error in upload or product creation:", uploadError);
-				return res.status(500).json({
-					success: false,
-					message: uploadError.message || "Gagal membuat produk",
-				});
-			}
-		});
-	} catch (error) {
-		console.error("Error creating product:", error);
-		return res.status(500).json({
+	// Route handling based on HTTP method
+	if (req.method === "GET") {
+		// Route to specific ID if provided, otherwise get all products
+		if (req.query.id) {
+			return await getProductById(req, res);
+		} else {
+			return await getAllProducts(req, res);
+		}
+	} else {
+		// Method not allowed for this endpoint (POST, PUT, DELETE are in admin routes)
+		return res.status(405).json({
 			success: false,
-			message: "Terjadi kesalahan pada server",
+			message: "Method Not Allowed",
 		});
 	}
-});
-
-// PUT /api/products/:id - Admin only route to update a product
-router.put("/:id", async (req, res) => {
-	try {
-		// Authenticate admin
-		await authMiddleware(req, res);
-		if (res.statusCode === 401 || res.statusCode === 403) return;
-
-		// Check admin role
-		await roleCheck(["admin", "super_admin"])(req, res);
-		if (res.statusCode === 403) return;
-
-		await connectDB();
-
-		// Find product to update
-		const product = await Product.findById(req.params.id);
-
-		if (!product) {
-			return res.status(404).json({
-				success: false,
-				message: "Produk tidak ditemukan",
-			});
-		}
-
-		// Handle file upload if there's a new image
-		upload.single("gambar")(req, res, async (err) => {
-			if (err) {
-				return res.status(400).json({
-					success: false,
-					message: err.message,
-				});
-			}
-
-			// Prepare update data
-			const updateData = { ...req.body };
-
-			// Convert string booleans to actual booleans
-			if (updateData.isForRent !== undefined) {
-				updateData.isForRent = updateData.isForRent === "true";
-			}
-
-			if (updateData.isForSale !== undefined) {
-				updateData.isForSale = updateData.isForSale === "true";
-			}
-
-			// Validate that product can be either for rent or for sale
-			if (updateData.isForRent === false && updateData.isForSale === false) {
-				return res.status(400).json({
-					success: false,
-					message: "Produk harus bisa disewa atau dijual",
-				});
-			}
-
-			// Convert numeric strings to numbers
-			if (updateData.harga) {
-				updateData.harga = Number(updateData.harga);
-			}
-
-			if (updateData.stok) {
-				updateData.stok = Number(updateData.stok);
-			}
-
-			// Handle image upload if there's a new image
-			if (req.file) {
-				try {
-					// Delete old image from Cloudinary if it exists
-					if (product.cloudinary_id) {
-						await cloudinary.uploader.destroy(product.cloudinary_id);
-					}
-
-					// Upload new image
-					const { url, public_id } = await uploadToCloudinary(req.file);
-
-					// Add image data to update
-					updateData.gambar = url;
-					updateData.cloudinary_id = public_id;
-				} catch (uploadError) {
-					console.error("Error updating image:", uploadError);
-					return res.status(500).json({
-						success: false,
-						message: "Gagal mengupdate gambar produk",
-					});
-				}
-			}
-
-			try {
-				// Update product
-				const updatedProduct = await Product.findByIdAndUpdate(
-					req.params.id,
-					updateData,
-					{ new: true, runValidators: true }
-				);
-
-				return res.status(200).json({
-					success: true,
-					data: updatedProduct,
-				});
-			} catch (updateError) {
-				console.error("Error updating product:", updateError);
-				return res.status(500).json({
-					success: false,
-					message: updateError.message || "Gagal mengupdate produk",
-				});
-			}
-		});
-	} catch (error) {
-		console.error("Error updating product:", error);
-		return res.status(500).json({
-			success: false,
-			message: "Terjadi kesalahan pada server",
-		});
-	}
-});
-
-// DELETE /api/products/:id - Admin only route to delete a product
-router.delete("/:id", async (req, res) => {
-	try {
-		// Authenticate admin
-		await authMiddleware(req, res);
-		if (res.statusCode === 401 || res.statusCode === 403) return;
-
-		// Check admin role
-		await roleCheck(["admin", "super_admin"])(req, res);
-		if (res.statusCode === 403) return;
-
-		await connectDB();
-
-		// Find product to delete
-		const product = await Product.findById(req.params.id);
-
-		if (!product) {
-			return res.status(404).json({
-				success: false,
-				message: "Produk tidak ditemukan",
-			});
-		}
-
-		// Delete image from Cloudinary if it exists
-		if (product.cloudinary_id) {
-			await cloudinary.uploader.destroy(product.cloudinary_id);
-		}
-
-		// Delete product from database
-		await Product.findByIdAndDelete(req.params.id);
-
-		return res.status(200).json({
-			success: true,
-			message: "Produk berhasil dihapus",
-		});
-	} catch (error) {
-		console.error("Error deleting product:", error);
-		return res.status(500).json({
-			success: false,
-			message: "Terjadi kesalahan pada server",
-		});
-	}
-});
-
-export default router.handler();
+}

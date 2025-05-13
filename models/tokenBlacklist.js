@@ -9,20 +9,29 @@ const TokenBlacklistSchema = new mongoose.Schema({
 	createdAt: {
 		type: Date,
 		default: Date.now,
-		expires: "1d", // Automatically expire entries after token expiry (matches JWT_EXPIRES)
+		expires: "1d",
 	},
 });
 
-// Create index for fast lookup
-TokenBlacklistSchema.index({ token: 1 });
+// Add the static method directly to the schema
+TokenBlacklistSchema.statics.isBlacklisted = async function (token) {
+	try {
+		// Check connection state
+		if (mongoose.connection.readyState !== 1) {
+			await mongoose.connect(process.env.MONGODB_URI);
+		}
 
-// Add static methods if needed
-TokenBlacklistSchema.statics = {
-	async isBlacklisted(token) {
 		const count = await this.countDocuments({ token });
 		return count > 0;
-	},
+	} catch (error) {
+		console.error("Blacklist check error:", error);
+		return false;
+	}
 };
 
-export default mongoose.models.TokenBlacklist ||
+// Create the model
+const TokenBlacklist =
+	mongoose.models.TokenBlacklist ||
 	mongoose.model("TokenBlacklist", TokenBlacklistSchema);
+
+export default TokenBlacklist;

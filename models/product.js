@@ -95,6 +95,8 @@ ProductSchema.statics.findByType = function (type) {
 	return this.find({});
 };
 
+// Check if the model exists before creating a new one
+// This is important for hot reloading in development
 const Product =
 	mongoose.models.Product || mongoose.model("Product", ProductSchema);
 
