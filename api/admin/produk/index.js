@@ -1,9 +1,9 @@
 import { createRouter } from "next/router";
 import multer from "multer";
-import connectDB from "../../lib/db.js";
-import { authMiddleware, roleCheck } from "../../lib/auth.js";
-import { cloudinary } from "../../lib/cloudinary.js";
-import Product from "../../models/product.js";
+import connectDB from "../../../lib/db.js";
+import { authMiddleware, roleCheck } from "../../../lib/auth.js";
+import { cloudinary } from "../../../lib/cloudinary.js";
+import Product from "../../../models/product.js";
 
 // Multer setup for memory storage (we'll upload to Cloudinary later)
 const storage = multer.memoryStorage();
@@ -24,9 +24,6 @@ const upload = multer({
 		}
 	},
 });
-
-// Router setup
-const router = createRouter();
 
 // Helper function to upload image to Cloudinary
 const uploadToCloudinary = async (file) => {
@@ -51,73 +48,11 @@ const uploadToCloudinary = async (file) => {
 	}
 };
 
-// GET /api/products - Public route to get all products
-router.get(async (req, res) => {
-	try {
-		await connectDB();
+// Router setup
+const router = createRouter();
 
-		// Build query based on filters
-		const query = {};
-
-		// Filter by kategori if provided
-		if (req.query.kategori) {
-			query.kategori = req.query.kategori;
-		}
-
-		// Filter by type (rent or sale)
-		if (req.query.isForRent === "true") {
-			query.isForRent = true;
-		}
-
-		if (req.query.isForSale === "true") {
-			query.isForSale = true;
-		}
-
-		const products = await Product.find(query).sort({ createdAt: -1 });
-
-		return res.status(200).json({
-			success: true,
-			count: products.length,
-			data: products,
-		});
-	} catch (error) {
-		console.error("Error getting products:", error);
-		return res.status(500).json({
-			success: false,
-			message: "Terjadi kesalahan pada server",
-		});
-	}
-});
-
-// GET /api/products/:id - Public route to get a specific product
-router.get("/:id", async (req, res) => {
-	try {
-		await connectDB();
-
-		const product = await Product.findById(req.params.id);
-
-		if (!product) {
-			return res.status(404).json({
-				success: false,
-				message: "Produk tidak ditemukan",
-			});
-		}
-
-		return res.status(200).json({
-			success: true,
-			data: product,
-		});
-	} catch (error) {
-		console.error("Error getting product:", error);
-		return res.status(500).json({
-			success: false,
-			message: "Terjadi kesalahan pada server",
-		});
-	}
-});
-
-// POST /api/products - Admin only route to create a product
-router.post(async (req, res) => {
+// POST /api/admin/products - Admin only route to create a product
+router.post("/", async (req, res) => {
 	try {
 		// Authenticate admin
 		await authMiddleware(req, res);
@@ -210,7 +145,7 @@ router.post(async (req, res) => {
 	}
 });
 
-// PUT /api/products/:id - Admin only route to update a product
+// PUT /api/admin/products/:id - Admin only route to update a product
 router.put("/:id", async (req, res) => {
 	try {
 		// Authenticate admin
@@ -323,7 +258,7 @@ router.put("/:id", async (req, res) => {
 	}
 });
 
-// DELETE /api/products/:id - Admin only route to delete a product
+// DELETE /api/admin/products/:id - Admin only route to delete a product
 router.delete("/:id", async (req, res) => {
 	try {
 		// Authenticate admin

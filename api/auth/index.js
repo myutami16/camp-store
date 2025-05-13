@@ -1,6 +1,7 @@
 import connectDB from "../../lib/db.js";
 import Admin from "../../models/admin.js";
-import { authMiddleware } from "../../lib/auth.js"; // Now this works as expected
+import { authMiddleware, invalidateToken } from "../../lib/auth.js";
+import TokenBlacklist from "../../models/tokenBlacklist.js";
 
 const validateLoginInput = (username, password) => {
 	const errors = {};
@@ -32,6 +33,11 @@ export default async function handler(req, res) {
 
 		switch (req.method) {
 			case "POST":
+				// Check if it's a logout request
+				if (req.body && req.body.action === "logout") {
+					return await handleLogout(req, res);
+				}
+				// Otherwise treat as login
 				return await handleLogin(req, res);
 			case "GET":
 				return await handleGetAdmin(req, res);
@@ -112,6 +118,36 @@ async function handleGetAdmin(req, res) {
 		return res.status(500).json({
 			success: false,
 			message: "Gagal memverifikasi token",
+		});
+	}
+}
+
+async function handleLogout(req, res) {
+	try {
+		// Validate Authorization header
+		const authHeader = req.headers.authorization;
+		if (!authHeader || !authHeader.startsWith("Bearer ")) {
+			return res.status(401).json({
+				success: false,
+				message: "Akses ditolak. Token tidak tersedia",
+			});
+		}
+
+		// Extract token
+		const token = authHeader.split(" ")[1];
+
+		// Add token to blacklist
+		await invalidateToken(token);
+
+		return res.json({
+			success: true,
+			message: "Logout berhasil",
+		});
+	} catch (error) {
+		console.error("Logout error:", error);
+		return res.status(500).json({
+			success: false,
+			message: "Terjadi kesalahan saat logout",
 		});
 	}
 }
