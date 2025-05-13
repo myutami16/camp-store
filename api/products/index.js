@@ -1,53 +1,8 @@
-import multer from "multer";
+// Fixed products public API route
 import connectDB from "../../lib/db.js";
-import { authMiddleware, roleCheck } from "../../lib/auth.js";
-import { cloudinary } from "../../lib/cloudinary.js";
 import Product from "../../models/product.js";
 
-// Multer setup for memory storage (we'll upload to Cloudinary later)
-const storage = multer.memoryStorage();
-const upload = multer({
-	storage,
-	limits: {
-		fileSize: 5 * 1024 * 1024, // 5MB limit
-	},
-	fileFilter: (req, file, cb) => {
-		// Accept only jpeg and png
-		if (file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
-			cb(null, true);
-		} else {
-			cb(
-				new Error("Format file tidak didukung. Gunakan format JPEG atau PNG."),
-				false
-			);
-		}
-	},
-});
-
-// Helper function to upload image to Cloudinary
-const uploadToCloudinary = async (file) => {
-	try {
-		// Convert buffer to base64
-		const fileStr = `data:${file.mimetype};base64,${file.buffer.toString(
-			"base64"
-		)}`;
-
-		// Upload to Cloudinary
-		const uploadResult = await cloudinary.uploader.upload(fileStr, {
-			folder: "camping-store/products",
-		});
-
-		return {
-			url: uploadResult.secure_url,
-			public_id: uploadResult.public_id,
-		};
-	} catch (error) {
-		console.error("Error uploading to Cloudinary:", error);
-		throw new Error("Gagal mengupload gambar");
-	}
-};
-
-// This is the handler for GET /api/products - Public route to get all products
+// GET /api/products - Public route to get all products with filtering
 export const getAllProducts = async (req, res) => {
 	try {
 		await connectDB();
@@ -69,11 +24,54 @@ export const getAllProducts = async (req, res) => {
 			query.isForSale = true;
 		}
 
-		const products = await Product.find(query).sort({ createdAt: -1 });
+		// Pagination
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 10;
+		const skip = (page - 1) * limit;
+
+		// Sort options
+		let sort = { createdAt: -1 }; // Default: newest first
+
+		if (req.query.sort) {
+			switch (req.query.sort) {
+				case "price_asc":
+					sort = { harga: 1 };
+					break;
+				case "price_desc":
+					sort = { harga: -1 };
+					break;
+				case "newest":
+					sort = { createdAt: -1 };
+					break;
+				case "oldest":
+					sort = { createdAt: 1 };
+					break;
+			}
+		}
+
+		// Text search if provided
+		if (req.query.search) {
+			query.$or = [
+				{ namaProduk: { $regex: req.query.search, $options: "i" } },
+				{ deskripsi: { $regex: req.query.search, $options: "i" } },
+			];
+		}
+
+		// Execute query with pagination
+		const products = await Product.find(query)
+			.sort(sort)
+			.skip(skip)
+			.limit(limit);
+
+		// Get total count for pagination info
+		const totalCount = await Product.countDocuments(query);
 
 		return res.status(200).json({
 			success: true,
 			count: products.length,
+			totalCount,
+			totalPages: Math.ceil(totalCount / limit),
+			currentPage: page,
 			data: products,
 		});
 	} catch (error) {
@@ -112,6 +110,28 @@ export const getProductById = async (req, res) => {
 	}
 };
 
+// GET /api/products/categories - Get unique product categories
+export const getCategories = async (req, res) => {
+	try {
+		await connectDB();
+
+		// Find unique categories across all products
+		const categories = await Product.distinct("kategori");
+
+		return res.status(200).json({
+			success: true,
+			count: categories.length,
+			data: categories,
+		});
+	} catch (error) {
+		console.error("Error getting categories:", error);
+		return res.status(500).json({
+			success: false,
+			message: "Terjadi kesalahan pada server",
+		});
+	}
+};
+
 // Main handler function for API routes
 export default async function handler(req, res) {
 	// Set CORS headers
@@ -133,8 +153,12 @@ export default async function handler(req, res) {
 
 	// Route handling based on HTTP method
 	if (req.method === "GET") {
+		// Special route for categories
+		if (req.query.path === "categories") {
+			return await getCategories(req, res);
+		}
 		// Route to specific ID if provided, otherwise get all products
-		if (req.query.id) {
+		else if (req.query.id) {
 			return await getProductById(req, res);
 		} else {
 			return await getAllProducts(req, res);

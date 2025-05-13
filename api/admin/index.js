@@ -77,7 +77,7 @@ const formatAdminResponse = (admin) => ({
 
 // Export main handler with connection management
 export default async function handler(req, res) {
-	// Set CORS headers
+	// CORS
 	res.setHeader("Access-Control-Allow-Credentials", true);
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader(
@@ -89,22 +89,38 @@ export default async function handler(req, res) {
 		"X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
 	);
 
-	// Handle OPTIONS request for CORS preflight
 	if (req.method === "OPTIONS") {
 		res.status(200).end();
 		return;
 	}
 
 	try {
-		// Establish database connection with a timeout
+		// ✅ Panggil multer PALING AWAL
+		if (req.method === "POST" || req.method === "PUT") {
+			await new Promise((resolve, reject) => {
+				upload.single("gambar")(req, res, (err) => {
+					if (err) {
+						console.error("🔥 Multer early error:", err);
+						res.status(400).json({ success: false, message: err.message });
+						return reject(err);
+					}
+					resolve();
+				});
+			});
+
+			// 🔍 DEBUGGING
+			console.log("📦 File received:", req.file);
+			console.log("📝 Body received:", req.body);
+		}
+
+		// ⏳ Koneksi DB (setelah multer)
 		const connectionPromise = connectDB();
 		const timeoutPromise = new Promise((_, reject) =>
 			setTimeout(() => reject(new Error("Database connection timed out")), 5000)
 		);
-
 		await Promise.race([connectionPromise, timeoutPromise]);
 
-		// Route handling
+		// ✅ Routing dengan protectRoute
 		switch (req.method) {
 			case "GET":
 				return protectRoute(handleGetAdmin, ["super-admin", "admin"])(req, res);
@@ -122,11 +138,8 @@ export default async function handler(req, res) {
 				});
 		}
 	} catch (error) {
-		console.error("Global handler error:", error);
-		return res.status(500).json({
-			success: false,
-			message: "Terjadi kesalahan pada server",
-		});
+		console.error("API Error:", error);
+		res.status(500).json({ success: false, message: "Internal Server Error" });
 	}
 }
 

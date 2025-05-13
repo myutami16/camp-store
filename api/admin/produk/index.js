@@ -1,45 +1,44 @@
+// Fix multipart form data handling in serverless environment
+import { IncomingForm } from "formidable";
+import connectDB from "../../../lib/db.js";
+import { authMiddleware, roleCheck } from "../../../lib/auth.js";
+import { cloudinary } from "../../../lib/cloudinary.js";
+import Product from "../../../models/product.js";
+import fs from "fs";
+
+// Configure API route to disable body parsing (we'll handle it with formidable)
 export const config = {
 	api: {
 		bodyParser: false,
 	},
 };
 
-import multer from "multer";
-import connectDB from "../../../lib/db.js";
-import { authMiddleware, roleCheck } from "../../../lib/auth.js";
-import { cloudinary } from "../../../lib/cloudinary.js";
-import Product from "../../../models/product.js";
+// Helper function to parse form data using formidable
+const parseForm = async (req) => {
+	return new Promise((resolve, reject) => {
+		const form = new IncomingForm({
+			keepExtensions: true,
+			maxFileSize: 5 * 1024 * 1024, // 5MB limit
+			filter: (part) => {
+				return part.mimetype === "image/jpeg" || part.mimetype === "image/png";
+			},
+		});
 
-// Multer setup for memory storage (we'll upload to Cloudinary later)
-const storage = multer.memoryStorage();
-const upload = multer({
-	storage,
-	limits: {
-		fileSize: 5 * 1024 * 1024, // 5MB limit
-	},
-	fileFilter: (req, file, cb) => {
-		// Accept only jpeg and png
-		if (file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
-			cb(null, true);
-		} else {
-			cb(
-				new Error("Format file tidak didukung. Gunakan format JPEG atau PNG."),
-				false
-			);
-		}
-	},
-});
+		form.parse(req, (err, fields, files) => {
+			if (err) {
+				console.error("Form parsing error:", err);
+				return reject(err);
+			}
+			resolve({ fields, files });
+		});
+	});
+};
 
 // Helper function to upload image to Cloudinary
-const uploadToCloudinary = async (file) => {
+const uploadToCloudinary = async (filePath, mimetype) => {
 	try {
-		// Convert buffer to base64
-		const fileStr = `data:${file.mimetype};base64,${file.buffer.toString(
-			"base64"
-		)}`;
-
 		// Upload to Cloudinary
-		const uploadResult = await cloudinary.uploader.upload(fileStr, {
+		const uploadResult = await cloudinary.uploader.upload(filePath, {
 			folder: "camping-store/products",
 		});
 
@@ -66,44 +65,32 @@ export const createProduct = async (req, res) => {
 
 		await connectDB();
 
-		// Handle file upload using multer
-		const multerUpload = async () => {
-			return new Promise((resolve, reject) => {
-				upload.single("gambar")(req, res, (err) => {
-					if (err) {
-						console.error("🔥 Multer inner error:", err); // 🧠 Ini penting
-						reject(err);
-					} else {
-						console.log("✅ Multer passed");
-						resolve();
-					}
-				});
-			});
-		};
-
+		// Parse the multipart form data
+		let fields, files;
 		try {
-			await multerUpload();
-			console.log("✔️ Upload success:");
-			console.log("📦 req.file:", req.file);
-			console.log("📝 req.body:", req.body);
+			const formData = await parseForm(req);
+			fields = formData.fields;
+			files = formData.files;
+
+			console.log("✅ Form parsed successfully:");
+			console.log("📦 Files:", Object.keys(files));
+			console.log("📝 Fields:", fields);
 		} catch (err) {
-			console.error("❌ Multer error:", err); // 🔥 Tambahkan ini
+			console.error("❌ Form parsing error:", err);
 			return res.status(400).json({
 				success: false,
-				message: err.message || "Error uploading file",
+				message: err.message || "Error parsing form data",
 			});
 		}
 
 		// Validate required fields
-		const {
-			namaProduk,
-			deskripsi,
-			harga,
-			stok,
-			isForRent,
-			isForSale,
-			kategori,
-		} = req.body;
+		const namaProduk = fields.namaProduk?.[0];
+		const deskripsi = fields.deskripsi?.[0];
+		const harga = fields.harga?.[0];
+		const stok = fields.stok?.[0];
+		const isForRent = fields.isForRent?.[0] || "false";
+		const isForSale = fields.isForSale?.[0] || "true";
+		const kategori = fields.kategori?.[0];
 
 		if (!namaProduk || !deskripsi || !harga || !stok || !kategori) {
 			return res.status(400).json({
@@ -121,7 +108,8 @@ export const createProduct = async (req, res) => {
 		}
 
 		// Validate image is uploaded
-		if (!req.file) {
+		const gambarFile = files.gambar?.[0];
+		if (!gambarFile) {
 			return res.status(400).json({
 				success: false,
 				message: "Field 'gambar' (file) tidak ditemukan dalam request",
@@ -130,7 +118,10 @@ export const createProduct = async (req, res) => {
 
 		try {
 			// Upload image to Cloudinary
-			const { url, public_id } = await uploadToCloudinary(req.file);
+			const { url, public_id } = await uploadToCloudinary(
+				gambarFile.filepath,
+				gambarFile.mimetype
+			);
 
 			// Create new product
 			const product = await Product.create({
@@ -155,6 +146,13 @@ export const createProduct = async (req, res) => {
 				success: false,
 				message: uploadError.message || "Gagal membuat produk",
 			});
+		} finally {
+			// Clean up temporary files
+			if (gambarFile && gambarFile.filepath) {
+				fs.unlink(gambarFile.filepath, (err) => {
+					if (err) console.error("Error deleting temp file:", err);
+				});
+			}
 		}
 	} catch (error) {
 		console.error("Error creating product:", error);
@@ -188,44 +186,39 @@ export const updateProduct = async (req, res) => {
 			});
 		}
 
-		// Handle file upload if there's a new image
-		const multerUpload = async () => {
-			return new Promise((resolve, reject) => {
-				upload.single("gambar")(req, res, (err) => {
-					if (err) {
-						console.error("🔥 Multer inner error:", err); // 🧠 Ini penting
-						reject(err);
-					} else {
-						console.log("✅ Multer passed");
-						resolve();
-					}
-				});
-			});
-		};
-
+		// Parse the multipart form data
+		let fields, files;
 		try {
-			await multerUpload();
-			console.log("✔️ Upload success:");
-			console.log("📦 req.file:", req.file);
-			console.log("📝 req.body:", req.body);
+			const formData = await parseForm(req);
+			fields = formData.fields;
+			files = formData.files;
 		} catch (err) {
-			console.error("❌ Multer error:", err); // 🔥 Tambahkan ini
+			console.error("❌ Form parsing error:", err);
 			return res.status(400).json({
 				success: false,
-				message: err.message || "Error uploading file",
+				message: err.message || "Error parsing form data",
 			});
 		}
 
 		// Prepare update data
-		const updateData = { ...req.body };
+		const updateData = {};
 
-		// Convert string booleans to actual booleans
-		if (updateData.isForRent !== undefined) {
-			updateData.isForRent = updateData.isForRent === "true";
+		// Extract and validate fields
+		if (fields.namaProduk?.[0]) updateData.namaProduk = fields.namaProduk[0];
+		if (fields.deskripsi?.[0]) updateData.deskripsi = fields.deskripsi[0];
+		if (fields.kategori?.[0]) updateData.kategori = fields.kategori[0];
+
+		// Handle numeric fields
+		if (fields.harga?.[0]) updateData.harga = Number(fields.harga[0]);
+		if (fields.stok?.[0]) updateData.stok = Number(fields.stok[0]);
+
+		// Handle boolean fields
+		if (fields.isForRent !== undefined) {
+			updateData.isForRent = fields.isForRent[0] === "true";
 		}
 
-		if (updateData.isForSale !== undefined) {
-			updateData.isForSale = updateData.isForSale === "true";
+		if (fields.isForSale !== undefined) {
+			updateData.isForSale = fields.isForSale[0] === "true";
 		}
 
 		// Validate that product can be either for rent or for sale
@@ -236,17 +229,9 @@ export const updateProduct = async (req, res) => {
 			});
 		}
 
-		// Convert numeric strings to numbers
-		if (updateData.harga) {
-			updateData.harga = Number(updateData.harga);
-		}
-
-		if (updateData.stok) {
-			updateData.stok = Number(updateData.stok);
-		}
-
 		// Handle image upload if there's a new image
-		if (req.file) {
+		const gambarFile = files.gambar?.[0];
+		if (gambarFile) {
 			try {
 				// Delete old image from Cloudinary if it exists
 				if (product.cloudinary_id) {
@@ -254,7 +239,10 @@ export const updateProduct = async (req, res) => {
 				}
 
 				// Upload new image
-				const { url, public_id } = await uploadToCloudinary(req.file);
+				const { url, public_id } = await uploadToCloudinary(
+					gambarFile.filepath,
+					gambarFile.mimetype
+				);
 
 				// Add image data to update
 				updateData.gambar = url;
@@ -265,6 +253,13 @@ export const updateProduct = async (req, res) => {
 					success: false,
 					message: "Gagal mengupdate gambar produk",
 				});
+			} finally {
+				// Clean up temporary files
+				if (gambarFile.filepath) {
+					fs.unlink(gambarFile.filepath, (err) => {
+						if (err) console.error("Error deleting temp file:", err);
+					});
+				}
 			}
 		}
 
@@ -346,8 +341,6 @@ export default async function handler(req, res) {
 		// Set CORS headers
 		res.setHeader("Access-Control-Allow-Credentials", "true");
 		res.setHeader("Access-Control-Allow-Origin", "*");
-		// Alternatively for specific domains:
-		// res.setHeader("Access-Control-Allow-Origin", "https://yourdomain.com");
 		res.setHeader(
 			"Access-Control-Allow-Methods",
 			"GET, OPTIONS, PATCH, DELETE, POST, PUT"
