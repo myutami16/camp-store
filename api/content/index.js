@@ -2,6 +2,7 @@
 import connectDB from "../../lib/db.js";
 import Content from "../../models/content.js";
 import Admin from "../../models/admin.js"; // ← kamu tidak perlu simpan ke variabel
+import rateLimit from "../../../lib/rateLimit.js";
 
 // GET /api/content - Public route to get all content with filtering
 export const getAllContent = async (req, res) => {
@@ -207,6 +208,14 @@ export default async function handler(req, res) {
 	if (req.method === "OPTIONS") {
 		res.status(200).end();
 		return;
+	}
+
+	const allowed = await rateLimit(req, res, 30); // max 30 req/IP/menit
+	if (!allowed) {
+		return res.status(429).json({
+			success: false,
+			message: "Terlalu banyak permintaan. Coba lagi nanti.",
+		});
 	}
 
 	// Route handling based on HTTP method

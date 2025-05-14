@@ -5,6 +5,7 @@ import { authMiddleware, roleCheck } from "../../../lib/auth.js";
 import { cloudinary } from "../../../lib/cloudinary.js";
 import Content from "../../../models/content.js";
 import fs from "fs";
+import rateLimit from "../../../lib/rateLimit.js";
 
 // Configure API route to disable body parsing (we'll handle it with formidable)
 export const config = {
@@ -494,6 +495,14 @@ export default async function handler(req, res) {
 		if (req.method === "OPTIONS") {
 			res.status(200).end();
 			return;
+		}
+
+		const allowed = await rateLimit(req, res, 30); // max 30 req/IP/menit
+		if (!allowed) {
+			return res.status(429).json({
+				success: false,
+				message: "Terlalu banyak permintaan. Coba lagi nanti.",
+			});
 		}
 
 		// Route handling based on HTTP method
