@@ -2,7 +2,7 @@
 import connectDB from "../../lib/db.js";
 import Content from "../../models/content.js";
 import Admin from "../../models/admin.js"; // ← kamu tidak perlu simpan ke variabel
-import rateLimit from "../../../lib/rateLimit.js";
+import rateLimit from "../../lib/rateLimit.js";
 
 // GET /api/content - Public route to get all content with filtering
 export const getAllContent = async (req, res) => {
