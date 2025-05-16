@@ -1,10 +1,16 @@
 import mongoose from "mongoose";
+import slugify from "slugify";
 
 const ProductSchema = new mongoose.Schema({
 	namaProduk: {
 		type: String,
 		required: [true, "Nama produk wajib diisi"],
 		trim: true,
+	},
+	slug: {
+		type: String,
+		unique: true,
+		index: true,
 	},
 	deskripsi: {
 		type: String,
@@ -34,13 +40,14 @@ const ProductSchema = new mongoose.Schema({
 		required: [true, "Kategori produk wajib diisi"],
 		enum: {
 			values: [
-				"Tenda",
+				"Tenda Camping",
+				"Aksesori",
 				"Sleeping Bag",
-				"Cooking Set",
-				"Peralatan Penerangan",
-				"Aksesoris",
-				"Perlengkapan Keselamatan",
-				"Lainnya",
+				"Perlengkapan Outdoor & Survival",
+				"Lampu",
+				"Carrier & Ransel",
+				"Peralatan Memasak Outdoor",
+				"Lain-lain",
 			],
 			message: "Kategori {VALUE} tidak tersedia",
 		},
@@ -59,8 +66,17 @@ const ProductSchema = new mongoose.Schema({
 	},
 });
 
-// Middleware untuk validasi isForRent dan isForSale
+// 🔃 Middleware slug otomatis
 ProductSchema.pre("save", function (next) {
+	if (this.isModified("namaProduk") || this.isNew) {
+		const baseSlug = slugify(this.namaProduk, {
+			lower: true,
+			strict: true,
+			locale: "id",
+		});
+		this.slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
+	}
+	// Validasi isForRent / isForSale tetap
 	if (!this.isForRent && !this.isForSale) {
 		const error = new Error("Produk harus bisa disewa atau dijual");
 		return next(error);
@@ -68,11 +84,9 @@ ProductSchema.pre("save", function (next) {
 	next();
 });
 
-// Middleware untuk validasi update
+// 🔁 Validasi update
 ProductSchema.pre("findOneAndUpdate", function (next) {
 	const update = this.getUpdate();
-
-	// Hanya lakukan validasi jika kedua field diubah
 	if (update.isForRent === false && update.isForSale === false) {
 		const error = new Error("Produk harus bisa disewa atau dijual");
 		return next(error);
@@ -80,23 +94,17 @@ ProductSchema.pre("findOneAndUpdate", function (next) {
 	next();
 });
 
-// Method untuk mencari produk berdasarkan kategori
+// 📦 Static methods
 ProductSchema.statics.findByCategory = function (category) {
 	return this.find({ kategori: category });
 };
 
-// Method untuk mencari produk berdasarkan type (sewa/jual)
 ProductSchema.statics.findByType = function (type) {
-	if (type === "sewa") {
-		return this.find({ isForRent: true });
-	} else if (type === "jual") {
-		return this.find({ isForSale: true });
-	}
+	if (type === "sewa") return this.find({ isForRent: true });
+	if (type === "jual") return this.find({ isForSale: true });
 	return this.find({});
 };
 
-// Check if the model exists before creating a new one
-// This is important for hot reloading in development
 const Product =
 	mongoose.models.Product || mongoose.model("Product", ProductSchema);
 

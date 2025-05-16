@@ -7,65 +7,57 @@ export const getAllProducts = async (req, res) => {
 	try {
 		await connectDB();
 
-		// Build query based on filters
+		// 1. 🔍 Build query object
 		const query = {};
 
-		// Filter by kategori if provided
+		// 🔘 Filter kategori
 		if (req.query.kategori) {
 			query.kategori = req.query.kategori;
 		}
 
-		// Filter by type (rent or sale)
-		if (req.query.isForRent === "true") {
-			query.isForRent = true;
+		// 🔘 Filter tipe
+		if (req.query.isForRent === "true") query.isForRent = true;
+		if (req.query.isForSale === "true") query.isForSale = true;
+
+		// 🔍 Text search (by 'search' or 'q')
+		const searchKeyword = req.query.search || req.query.q;
+		if (searchKeyword) {
+			query.$or = [
+				{ namaProduk: { $regex: searchKeyword, $options: "i" } },
+				{ deskripsi: { $regex: searchKeyword, $options: "i" } },
+			];
 		}
 
-		if (req.query.isForSale === "true") {
-			query.isForSale = true;
-		}
-
-		// Pagination
+		// 2. 🧭 Pagination
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 10;
 		const skip = (page - 1) * limit;
 
-		// Sort options
-		let sort = { createdAt: -1 }; // Default: newest first
-
-		if (req.query.sort) {
-			switch (req.query.sort) {
-				case "price_asc":
-					sort = { harga: 1 };
-					break;
-				case "price_desc":
-					sort = { harga: -1 };
-					break;
-				case "newest":
-					sort = { createdAt: -1 };
-					break;
-				case "oldest":
-					sort = { createdAt: 1 };
-					break;
-			}
+		// 3. 📦 Sorting
+		let sort = { createdAt: -1 }; // default: newest first
+		switch (req.query.sort) {
+			case "price_asc":
+				sort = { harga: 1 };
+				break;
+			case "price_desc":
+				sort = { harga: -1 };
+				break;
+			case "oldest":
+				sort = { createdAt: 1 };
+				break;
+			default:
+				sort = { createdAt: -1 };
 		}
 
-		// Text search if provided
-		if (req.query.search) {
-			query.$or = [
-				{ namaProduk: { $regex: req.query.search, $options: "i" } },
-				{ deskripsi: { $regex: req.query.search, $options: "i" } },
-			];
-		}
-
-		// Execute query with pagination
+		// 4. 🚀 Query ke DB
 		const products = await Product.find(query)
 			.sort(sort)
 			.skip(skip)
 			.limit(limit);
 
-		// Get total count for pagination info
 		const totalCount = await Product.countDocuments(query);
 
+		// 5. 📤 Response final
 		return res.status(200).json({
 			success: true,
 			count: products.length,
@@ -153,21 +145,74 @@ export default async function handler(req, res) {
 
 	// Route handling based on HTTP method
 	if (req.method === "GET") {
-		// Special route for categories
+		// 🔍 Pencarian Produk via Query `q`
+		await connectDB();
+		if (req.query.q) {
+			const keyword = req.query.q.trim();
+			try {
+				const results = await Product.find({
+					$or: [
+						{ name: { $regex: keyword, $options: "i" } },
+						{ description: { $regex: keyword, $options: "i" } },
+					],
+				});
+
+				return res.status(200).json({
+					success: true,
+					count: results.length,
+					data: results,
+				});
+			} catch (error) {
+				console.error("Error saat pencarian produk:", error);
+				return res.status(500).json({
+					success: false,
+					message: "Gagal melakukan pencarian produk",
+				});
+			}
+		}
+
+		// 📁 Get distinct kategori
 		if (req.query.path === "categories") {
 			return await getCategories(req, res);
 		}
-		// Route to specific ID if provided, otherwise get all products
-		else if (req.query.id) {
+
+		// 🧾 Get detail by ID
+		if (req.query.id) {
 			return await getProductById(req, res);
-		} else {
-			return await getAllProducts(req, res);
 		}
-	} else {
-		// Method not allowed for this endpoint (POST, PUT, DELETE are in admin routes)
-		return res.status(405).json({
-			success: false,
-			message: "Method Not Allowed",
-		});
+
+		// 🔎 Get detail by slug
+		if (req.query.slug) {
+			try {
+				const product = await Product.findOne({ slug: req.query.slug });
+
+				if (!product) {
+					return res.status(404).json({
+						success: false,
+						message: "Produk tidak ditemukan berdasarkan slug",
+					});
+				}
+
+				return res.status(200).json({
+					success: true,
+					data: product,
+				});
+			} catch (error) {
+				console.error("Error getting product by slug:", error);
+				return res.status(500).json({
+					success: false,
+					message: "Terjadi kesalahan saat mencari produk by slug",
+				});
+			}
+		}
+
+		// 📦 Default: Get all products
+		return await getAllProducts(req, res);
 	}
+
+	// ❌ Method not allowed
+	return res.status(405).json({
+		success: false,
+		message: "Method Not Allowed",
+	});
 }
