@@ -1,7 +1,6 @@
-// api/content/index.js
 import connectDB from "../../lib/db.js";
 import Content from "../../models/content.js";
-import Admin from "../../models/admin.js"; // ← kamu tidak perlu simpan ke variabel
+import Admin from "../../models/admin.js";
 import rateLimit from "../../lib/rateLimit.js";
 
 // GET /api/content - Public route to get all content with filtering
@@ -9,20 +8,16 @@ export const getAllContent = async (req, res) => {
 	try {
 		await connectDB();
 
-		// Build query based on filters
 		const query = { isActive: true };
 
-		// Filter by contentType if provided
 		if (req.query.type) {
 			query.contentType = req.query.type;
 		}
 
-		// Filter by tag if provided
 		if (req.query.tag) {
 			query.tags = { $in: [req.query.tag] };
 		}
 
-		// Filter by publish date range
 		if (req.query.from) {
 			query.publishDate = {
 				...query.publishDate,
@@ -37,10 +32,8 @@ export const getAllContent = async (req, res) => {
 			};
 		}
 
-		// Show only non-expired content
 		query.$or = [{ expiryDate: { $gt: new Date() } }, { expiryDate: null }];
 
-		// Text search if provided
 		if (req.query.search) {
 			query.$and = [
 				{
@@ -53,13 +46,11 @@ export const getAllContent = async (req, res) => {
 			];
 		}
 
-		// Pagination
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 10;
 		const skip = (page - 1) * limit;
 
-		// Sort options
-		let sort = { publishDate: -1 }; // Default: newest first
+		let sort = { publishDate: -1 };
 
 		if (req.query.sort) {
 			switch (req.query.sort) {
@@ -75,15 +66,13 @@ export const getAllContent = async (req, res) => {
 			}
 		}
 
-		// Execute query with pagination
 		const content = await Content.find(query)
 			.populate("author", "username")
 			.sort(sort)
 			.skip(skip)
 			.limit(limit)
-			.select("-cloudinary_id"); // No need to expose cloudinary IDs to public
+			.select("-cloudinary_id");
 
-		// Get total count for pagination info
 		const totalCount = await Content.countDocuments(query);
 
 		return res.status(200).json({
@@ -117,7 +106,6 @@ export const getContentBySlug = async (req, res) => {
 			});
 		}
 
-		// Check if content is expired
 		if (content.isExpired()) {
 			return res.status(410).json({
 				success: false,
@@ -143,7 +131,6 @@ export const getContentTypes = async (req, res) => {
 	try {
 		await connectDB();
 
-		// Find unique content types and count
 		const types = await Content.aggregate([
 			{ $match: { isActive: true } },
 			{ $group: { _id: "$contentType", count: { $sum: 1 } } },
@@ -169,7 +156,6 @@ export const getTags = async (req, res) => {
 	try {
 		await connectDB();
 
-		// Unwind the tags array and then count occurrences
 		const tags = await Content.aggregate([
 			{ $match: { isActive: true } },
 			{ $unwind: "$tags" },
@@ -210,7 +196,7 @@ export default async function handler(req, res) {
 		return;
 	}
 
-	const allowed = await rateLimit(req, res, 30); // max 30 req/IP/menit
+	const allowed = await rateLimit(req, res, 30);
 	if (!allowed) {
 		return res.status(429).json({
 			success: false,
@@ -218,22 +204,17 @@ export default async function handler(req, res) {
 		});
 	}
 
-	// Route handling based on HTTP method
 	if (req.method === "GET") {
-		// Special routes for metadata
 		if (req.query.path === "types") {
 			return await getContentTypes(req, res);
 		} else if (req.query.path === "tags") {
 			return await getTags(req, res);
-		}
-		// Route to specific slug if provided, otherwise get all content
-		else if (req.query.slug) {
+		} else if (req.query.slug) {
 			return await getContentBySlug(req, res);
 		} else {
 			return await getAllContent(req, res);
 		}
 	} else {
-		// Method not allowed for this endpoint (POST, PUT, DELETE are in admin routes)
 		return res.status(405).json({
 			success: false,
 			message: "Method Not Allowed",

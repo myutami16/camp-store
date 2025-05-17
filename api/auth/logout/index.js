@@ -1,10 +1,8 @@
-// api/auth/logout/index.js
 import connectDB from "../../../lib/db.js";
 import { invalidateToken } from "../../../lib/auth.js";
 import TokenBlacklist from "../../../models/tokenBlacklist.js";
 
 export default async function handler(req, res) {
-	// Set CORS headers
 	res.setHeader("Access-Control-Allow-Credentials", true);
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -13,12 +11,10 @@ export default async function handler(req, res) {
 		"X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
 	);
 
-	// Handle CORS preflight
 	if (req.method === "OPTIONS") {
 		return res.status(200).end();
 	}
 
-	// Only allow POST method
 	if (req.method !== "POST") {
 		res.setHeader("Allow", ["POST", "OPTIONS"]);
 		return res.status(405).json({
@@ -30,7 +26,6 @@ export default async function handler(req, res) {
 	try {
 		await connectDB();
 
-		// Validate Authorization header
 		const authHeader = req.headers.authorization;
 		if (!authHeader || !authHeader.startsWith("Bearer ")) {
 			return res.status(401).json({
@@ -39,10 +34,8 @@ export default async function handler(req, res) {
 			});
 		}
 
-		// Extract token
 		const token = authHeader.split(" ")[1];
 
-		// Add token to blacklist
 		await invalidateToken(token);
 
 		return res.status(200).json({

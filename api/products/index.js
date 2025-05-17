@@ -1,4 +1,3 @@
-// Fixed products public API route
 import connectDB from "../../lib/db.js";
 import Product from "../../models/product.js";
 
@@ -7,19 +6,15 @@ export const getAllProducts = async (req, res) => {
 	try {
 		await connectDB();
 
-		// 1. 🔍 Build query object
 		const query = {};
 
-		// 🔘 Filter kategori
 		if (req.query.kategori) {
 			query.kategori = req.query.kategori;
 		}
 
-		// 🔘 Filter tipe
 		if (req.query.isForRent === "true") query.isForRent = true;
 		if (req.query.isForSale === "true") query.isForSale = true;
 
-		// 🔍 Text search (by 'search' or 'q')
 		const searchKeyword = req.query.search || req.query.q;
 		if (searchKeyword) {
 			query.$or = [
@@ -28,13 +23,11 @@ export const getAllProducts = async (req, res) => {
 			];
 		}
 
-		// 2. 🧭 Pagination
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 10;
 		const skip = (page - 1) * limit;
 
-		// 3. 📦 Sorting
-		let sort = { createdAt: -1 }; // default: newest first
+		let sort = { createdAt: -1 };
 		switch (req.query.sort) {
 			case "price_asc":
 				sort = { harga: 1 };
@@ -49,7 +42,6 @@ export const getAllProducts = async (req, res) => {
 				sort = { createdAt: -1 };
 		}
 
-		// 4. 🚀 Query ke DB
 		const products = await Product.find(query)
 			.sort(sort)
 			.skip(skip)
@@ -57,7 +49,6 @@ export const getAllProducts = async (req, res) => {
 
 		const totalCount = await Product.countDocuments(query);
 
-		// 5. 📤 Response final
 		return res.status(200).json({
 			success: true,
 			count: products.length,
@@ -107,7 +98,6 @@ export const getCategories = async (req, res) => {
 	try {
 		await connectDB();
 
-		// Find unique categories across all products
 		const categories = await Product.distinct("kategori");
 
 		return res.status(200).json({
@@ -126,7 +116,6 @@ export const getCategories = async (req, res) => {
 
 // Main handler function for API routes
 export default async function handler(req, res) {
-	// Set CORS headers
 	res.setHeader("Access-Control-Allow-Credentials", true);
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader(
@@ -143,9 +132,7 @@ export default async function handler(req, res) {
 		return;
 	}
 
-	// Route handling based on HTTP method
 	if (req.method === "GET") {
-		// 🔍 Pencarian Produk via Query `q`
 		await connectDB();
 		if (req.query.q) {
 			const keyword = req.query.q.trim();
@@ -171,17 +158,14 @@ export default async function handler(req, res) {
 			}
 		}
 
-		// 📁 Get distinct kategori
 		if (req.query.path === "categories") {
 			return await getCategories(req, res);
 		}
 
-		// 🧾 Get detail by ID
 		if (req.query.id) {
 			return await getProductById(req, res);
 		}
 
-		// 🔎 Get detail by slug
 		if (req.query.slug) {
 			try {
 				const product = await Product.findOne({ slug: req.query.slug });
@@ -206,11 +190,9 @@ export default async function handler(req, res) {
 			}
 		}
 
-		// 📦 Default: Get all products
 		return await getAllProducts(req, res);
 	}
 
-	// ❌ Method not allowed
 	return res.status(405).json({
 		success: false,
 		message: "Method Not Allowed",

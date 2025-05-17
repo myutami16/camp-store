@@ -16,7 +16,6 @@ const TokenBlacklistSchema = new mongoose.Schema({
 // Add the static method directly to the schema
 TokenBlacklistSchema.statics.isBlacklisted = async function (token) {
 	try {
-		// Check connection state
 		if (mongoose.connection.readyState !== 1) {
 			await mongoose.connect(process.env.MONGODB_URI);
 		}
@@ -29,7 +28,6 @@ TokenBlacklistSchema.statics.isBlacklisted = async function (token) {
 	}
 };
 
-// Create the model
 const TokenBlacklist =
 	mongoose.models.TokenBlacklist ||
 	mongoose.model("TokenBlacklist", TokenBlacklistSchema);

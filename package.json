@@ -20,12 +20,17 @@
 		"lib": "lib"
 	},
 	"devDependencies": {
+		"@jest/globals": "^29.7.0",
+		"jest": "^29.7.0",
+		"mongodb-memory-server": "^10.1.4",
+		"node-mocks-http": "^1.17.2",
 		"nodemon": "^3.1.10",
 		"vercel": "^31.4.0"
 	},
 	"scripts": {
-		"dev": "vercel dev",
-		"start": "vercel dev"
+		"dev": "node index.js",
+		"start": "node index.js",
+		"test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
 	},
 	"keywords": [
 		"camping",

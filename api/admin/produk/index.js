@@ -1,4 +1,3 @@
-// Fix multipart form data handling in serverless environment
 import { IncomingForm } from "formidable";
 import connectDB from "../../../lib/db.js";
 import { authMiddleware, roleCheck } from "../../../lib/auth.js";
@@ -6,19 +5,17 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
 
-// Configure API route to disable body parsing (we'll handle it with formidable)
 export const config = {
 	api: {
 		bodyParser: false,
 	},
 };
 
-// Helper function to parse form data using formidable
 const parseForm = async (req) => {
 	return new Promise((resolve, reject) => {
 		const form = new IncomingForm({
 			keepExtensions: true,
-			maxFileSize: 5 * 1024 * 1024, // 5MB limit
+			maxFileSize: 5 * 1024 * 1024,
 			filter: (part) => {
 				return part.mimetype === "image/jpeg" || part.mimetype === "image/png";
 			},
@@ -55,35 +52,31 @@ const uploadToCloudinary = async (filePath, mimetype) => {
 // POST /api/admin/produk - Admin only route to create a product
 export const createProduct = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Parse the multipart form data
 		let fields, files;
 		try {
 			const formData = await parseForm(req);
 			fields = formData.fields;
 			files = formData.files;
 
-			console.log("✅ Form parsed successfully:");
-			console.log("📦 Files:", Object.keys(files));
-			console.log("📝 Fields:", fields);
+			console.log("Form parsed successfully:");
+			console.log("Files:", Object.keys(files));
+			console.log("Fields:", fields);
 		} catch (err) {
-			console.error("❌ Form parsing error:", err);
+			console.error("Form parsing error:", err);
 			return res.status(400).json({
 				success: false,
 				message: err.message || "Error parsing form data",
 			});
 		}
 
-		// Validate required fields
 		const namaProduk = fields.namaProduk?.[0];
 		const deskripsi = fields.deskripsi?.[0];
 		const harga = fields.harga?.[0];
@@ -99,7 +92,6 @@ export const createProduct = async (req, res) => {
 			});
 		}
 
-		// Validate that either isForRent or isForSale is true
 		if (isForRent === "false" && isForSale === "false") {
 			return res.status(400).json({
 				success: false,
@@ -107,7 +99,6 @@ export const createProduct = async (req, res) => {
 			});
 		}
 
-		// Validate image is uploaded
 		const gambarFile = files.gambar?.[0];
 		if (!gambarFile) {
 			return res.status(400).json({
@@ -117,13 +108,11 @@ export const createProduct = async (req, res) => {
 		}
 
 		try {
-			// Upload image to Cloudinary
 			const { url, public_id } = await uploadToCloudinary(
 				gambarFile.filepath,
 				gambarFile.mimetype
 			);
 
-			// Create new product
 			const product = await Product.create({
 				namaProduk,
 				deskripsi,
@@ -147,7 +136,6 @@ export const createProduct = async (req, res) => {
 				message: uploadError.message || "Gagal membuat produk",
 			});
 		} finally {
-			// Clean up temporary files
 			if (gambarFile && gambarFile.filepath) {
 				fs.unlink(gambarFile.filepath, (err) => {
 					if (err) console.error("Error deleting temp file:", err);
@@ -166,17 +154,14 @@ export const createProduct = async (req, res) => {
 // PUT /api/admin/produk/:id - Admin only route to update a product
 export const updateProduct = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Find product to update
 		const product = await Product.findById(req.query.id);
 
 		if (!product) {
@@ -186,33 +171,28 @@ export const updateProduct = async (req, res) => {
 			});
 		}
 
-		// Parse the multipart form data
 		let fields, files;
 		try {
 			const formData = await parseForm(req);
 			fields = formData.fields;
 			files = formData.files;
 		} catch (err) {
-			console.error("❌ Form parsing error:", err);
+			console.error("Form parsing error:", err);
 			return res.status(400).json({
 				success: false,
 				message: err.message || "Error parsing form data",
 			});
 		}
 
-		// Prepare update data
 		const updateData = {};
 
-		// Extract and validate fields
 		if (fields.namaProduk?.[0]) updateData.namaProduk = fields.namaProduk[0];
 		if (fields.deskripsi?.[0]) updateData.deskripsi = fields.deskripsi[0];
 		if (fields.kategori?.[0]) updateData.kategori = fields.kategori[0];
 
-		// Handle numeric fields
 		if (fields.harga?.[0]) updateData.harga = Number(fields.harga[0]);
 		if (fields.stok?.[0]) updateData.stok = Number(fields.stok[0]);
 
-		// Handle boolean fields
 		if (fields.isForRent !== undefined) {
 			updateData.isForRent = fields.isForRent[0] === "true";
 		}
@@ -221,7 +201,6 @@ export const updateProduct = async (req, res) => {
 			updateData.isForSale = fields.isForSale[0] === "true";
 		}
 
-		// Validate that product can be either for rent or for sale
 		if (updateData.isForRent === false && updateData.isForSale === false) {
 			return res.status(400).json({
 				success: false,
@@ -229,22 +208,18 @@ export const updateProduct = async (req, res) => {
 			});
 		}
 
-		// Handle image upload if there's a new image
 		const gambarFile = files.gambar?.[0];
 		if (gambarFile) {
 			try {
-				// Delete old image from Cloudinary if it exists
 				if (product.cloudinary_id) {
 					await cloudinary.uploader.destroy(product.cloudinary_id);
 				}
 
-				// Upload new image
 				const { url, public_id } = await uploadToCloudinary(
 					gambarFile.filepath,
 					gambarFile.mimetype
 				);
 
-				// Add image data to update
 				updateData.gambar = url;
 				updateData.cloudinary_id = public_id;
 			} catch (uploadError) {
@@ -254,7 +229,6 @@ export const updateProduct = async (req, res) => {
 					message: "Gagal mengupdate gambar produk",
 				});
 			} finally {
-				// Clean up temporary files
 				if (gambarFile.filepath) {
 					fs.unlink(gambarFile.filepath, (err) => {
 						if (err) console.error("Error deleting temp file:", err);
@@ -264,7 +238,6 @@ export const updateProduct = async (req, res) => {
 		}
 
 		try {
-			// Update product
 			const updatedProduct = await Product.findByIdAndUpdate(
 				req.query.id,
 				updateData,
@@ -294,17 +267,14 @@ export const updateProduct = async (req, res) => {
 // DELETE /api/admin/produk/:id - Admin only route to delete a product
 export const deleteProduct = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Find product to delete
 		const product = await Product.findById(req.query.id);
 
 		if (!product) {
@@ -314,12 +284,10 @@ export const deleteProduct = async (req, res) => {
 			});
 		}
 
-		// Delete image from Cloudinary if it exists
 		if (product.cloudinary_id) {
 			await cloudinary.uploader.destroy(product.cloudinary_id);
 		}
 
-		// Delete product from database
 		await Product.findByIdAndDelete(req.query.id);
 
 		return res.status(200).json({
@@ -338,7 +306,6 @@ export const deleteProduct = async (req, res) => {
 // Main handler function for API routes
 export default async function handler(req, res) {
 	try {
-		// Set CORS headers
 		res.setHeader("Access-Control-Allow-Credentials", "true");
 		res.setHeader("Access-Control-Allow-Origin", "*");
 		res.setHeader(
@@ -350,13 +317,11 @@ export default async function handler(req, res) {
 			"X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
 		);
 
-		// Handle OPTIONS requests (pre-flight)
 		if (req.method === "OPTIONS") {
 			res.status(200).end();
 			return;
 		}
 
-		// Route handling based on HTTP method
 		switch (req.method) {
 			case "POST":
 				await createProduct(req, res);

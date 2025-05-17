@@ -1,4 +1,3 @@
-// models/Content.js
 import mongoose from "mongoose";
 import slugify from "slugify";
 
@@ -46,7 +45,6 @@ const ContentSchema = new mongoose.Schema(
 		},
 		expiryDate: {
 			type: Date,
-			// Optional, only needed for time-sensitive content like promos
 		},
 		isActive: {
 			type: Boolean,
@@ -71,16 +69,13 @@ const ContentSchema = new mongoose.Schema(
 
 // Create slug from title before saving
 ContentSchema.pre("save", function (next) {
-	// Only generate slug if title is modified or it's a new document
 	if (this.isModified("title") || this.isNew) {
-		// Generate a basic slug
 		let baseSlug = slugify(this.title, {
 			lower: true,
 			strict: true,
 			locale: "id",
 		});
 
-		// Add a timestamp to ensure uniqueness
 		this.slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
 	}
 	next();

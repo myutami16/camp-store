@@ -63,12 +63,10 @@ AdminSchema.methods = {
 	},
 };
 
-// Static methods
 AdminSchema.statics = {
 	findByRole(role) {
 		return this.find({ role });
 	},
 };
 
-// Export model
 export default mongoose.models.Admin || mongoose.model("Admin", AdminSchema);

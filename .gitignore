@@ -1,3 +1,9 @@
+#test
+tests/
+*.test.mjs
+uploadImage.js
+jest.config.mjs
+
 # Node modules
 node_modules/
 

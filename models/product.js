@@ -60,13 +60,13 @@ const ProductSchema = new mongoose.Schema({
 		type: Date,
 		default: Date.now,
 	},
-	// Tambahkan cloudinary_id untuk memudahkan penghapusan gambar dari Cloudinary
+
 	cloudinary_id: {
 		type: String,
 	},
 });
 
-// 🔃 Middleware slug otomatis
+// Middleware slug otomatis
 ProductSchema.pre("save", function (next) {
 	if (this.isModified("namaProduk") || this.isNew) {
 		const baseSlug = slugify(this.namaProduk, {
@@ -76,7 +76,7 @@ ProductSchema.pre("save", function (next) {
 		});
 		this.slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
 	}
-	// Validasi isForRent / isForSale tetap
+
 	if (!this.isForRent && !this.isForSale) {
 		const error = new Error("Produk harus bisa disewa atau dijual");
 		return next(error);
@@ -84,7 +84,7 @@ ProductSchema.pre("save", function (next) {
 	next();
 });
 
-// 🔁 Validasi update
+// Validasi update
 ProductSchema.pre("findOneAndUpdate", function (next) {
 	const update = this.getUpdate();
 	if (update.isForRent === false && update.isForSale === false) {
@@ -94,7 +94,7 @@ ProductSchema.pre("findOneAndUpdate", function (next) {
 	next();
 });
 
-// 📦 Static methods
+// Static methods
 ProductSchema.statics.findByCategory = function (category) {
 	return this.find({ kategori: category });
 };

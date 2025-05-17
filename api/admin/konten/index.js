@@ -1,4 +1,3 @@
-// api/admin/konten/index.js
 import { IncomingForm } from "formidable";
 import connectDB from "../../../lib/db.js";
 import { authMiddleware, roleCheck } from "../../../lib/auth.js";
@@ -7,7 +6,6 @@ import Content from "../../../models/content.js";
 import fs from "fs";
 import rateLimit from "../../../lib/rateLimit.js";
 
-// Configure API route to disable body parsing (we'll handle it with formidable)
 export const config = {
 	api: {
 		bodyParser: false,
@@ -19,7 +17,7 @@ const parseForm = async (req) => {
 	return new Promise((resolve, reject) => {
 		const form = new IncomingForm({
 			keepExtensions: true,
-			maxFileSize: 5 * 1024 * 1024, // 5MB limit
+			maxFileSize: 5 * 1024 * 1024,
 			filter: (part) => {
 				return part.mimetype === "image/jpeg" || part.mimetype === "image/png";
 			},
@@ -38,7 +36,6 @@ const parseForm = async (req) => {
 // Helper function to upload image to Cloudinary
 const uploadToCloudinary = async (filePath, mimetype) => {
 	try {
-		// Upload to Cloudinary
 		const uploadResult = await cloudinary.uploader.upload(filePath, {
 			folder: "camping-store/content",
 		});
@@ -56,41 +53,36 @@ const uploadToCloudinary = async (filePath, mimetype) => {
 // POST /api/admin/konten - Admin only route to create content
 export const createContent = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Parse the multipart form data
 		let fields, files;
 		try {
 			const formData = await parseForm(req);
 			fields = formData.fields;
 			files = formData.files;
 
-			console.log("✅ Form parsed successfully:");
-			console.log("📦 Files:", Object.keys(files));
-			console.log("📝 Fields:", fields);
+			console.log("Form parsed successfully:");
+			console.log("Files:", Object.keys(files));
+			console.log("Fields:", fields);
 		} catch (err) {
-			console.error("❌ Form parsing error:", err);
+			console.error("Form parsing error:", err);
 			return res.status(400).json({
 				success: false,
 				message: err.message || "Error parsing form data",
 			});
 		}
 
-		// Validate required fields
 		const title = fields.title?.[0];
 		const description = fields.description?.[0];
 		const contentType = fields.contentType?.[0];
 		const summary = fields.summary?.[0] || "";
 
-		// Optional fields
 		const tags = fields.tags?.[0] ? JSON.parse(fields.tags[0]) : [];
 		const publishDate = fields.publishDate?.[0]
 			? new Date(fields.publishDate[0])
@@ -107,7 +99,6 @@ export const createContent = async (req, res) => {
 			});
 		}
 
-		// Validate image is uploaded
 		const imageFile = files.image?.[0];
 		if (!imageFile) {
 			return res.status(400).json({
@@ -117,7 +108,6 @@ export const createContent = async (req, res) => {
 		}
 
 		try {
-			// Upload image to Cloudinary
 			const { url, public_id } = await uploadToCloudinary(
 				imageFile.filepath,
 				imageFile.mimetype
@@ -149,7 +139,6 @@ export const createContent = async (req, res) => {
 				message: uploadError.message || "Gagal membuat konten",
 			});
 		} finally {
-			// Clean up temporary files
 			if (imageFile && imageFile.filepath) {
 				fs.unlink(imageFile.filepath, (err) => {
 					if (err) console.error("Error deleting temp file:", err);
@@ -168,17 +157,14 @@ export const createContent = async (req, res) => {
 // PUT /api/admin/konten/:id - Admin only route to update content
 export const updateContent = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Find content to update
 		const content = await Content.findById(req.query.id);
 
 		if (!content) {
@@ -188,30 +174,26 @@ export const updateContent = async (req, res) => {
 			});
 		}
 
-		// Parse the multipart form data
 		let fields, files;
 		try {
 			const formData = await parseForm(req);
 			fields = formData.fields;
 			files = formData.files;
 		} catch (err) {
-			console.error("❌ Form parsing error:", err);
+			console.error("Form parsing error:", err);
 			return res.status(400).json({
 				success: false,
 				message: err.message || "Error parsing form data",
 			});
 		}
 
-		// Prepare update data
 		const updateData = {};
 
-		// Extract and validate fields
 		if (fields.title?.[0]) updateData.title = fields.title[0];
 		if (fields.description?.[0]) updateData.description = fields.description[0];
 		if (fields.contentType?.[0]) updateData.contentType = fields.contentType[0];
 		if (fields.summary?.[0]) updateData.summary = fields.summary[0];
 
-		// Handle array fields
 		if (fields.tags?.[0]) {
 			try {
 				updateData.tags = JSON.parse(fields.tags[0]);
@@ -223,7 +205,6 @@ export const updateContent = async (req, res) => {
 			}
 		}
 
-		// Handle date fields
 		if (fields.publishDate?.[0]) {
 			updateData.publishDate = new Date(fields.publishDate[0]);
 		}
@@ -231,31 +212,24 @@ export const updateContent = async (req, res) => {
 		if (fields.expiryDate?.[0]) {
 			updateData.expiryDate = new Date(fields.expiryDate[0]);
 		} else if (fields.expiryDate === "") {
-			// Allow clearing the expiry date
 			updateData.expiryDate = null;
 		}
 
-		// Handle boolean fields
 		if (fields.isActive !== undefined) {
 			updateData.isActive = fields.isActive[0] === "true";
 		}
-
-		// Handle image upload if there's a new image
 		const imageFile = files.image?.[0];
 		if (imageFile) {
 			try {
-				// Delete old image from Cloudinary if it exists
 				if (content.cloudinary_id) {
 					await cloudinary.uploader.destroy(content.cloudinary_id);
 				}
 
-				// Upload new image
 				const { url, public_id } = await uploadToCloudinary(
 					imageFile.filepath,
 					imageFile.mimetype
 				);
 
-				// Add image data to update
 				updateData.image = url;
 				updateData.cloudinary_id = public_id;
 			} catch (uploadError) {
@@ -265,7 +239,6 @@ export const updateContent = async (req, res) => {
 					message: "Gagal mengupdate gambar konten",
 				});
 			} finally {
-				// Clean up temporary files
 				if (imageFile.filepath) {
 					fs.unlink(imageFile.filepath, (err) => {
 						if (err) console.error("Error deleting temp file:", err);
@@ -275,7 +248,6 @@ export const updateContent = async (req, res) => {
 		}
 
 		try {
-			// Update content
 			const updatedContent = await Content.findByIdAndUpdate(
 				req.query.id,
 				updateData,
@@ -305,17 +277,14 @@ export const updateContent = async (req, res) => {
 // DELETE /api/admin/konten/:id - Admin only route to delete content
 export const deleteContent = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Find content to delete
 		const content = await Content.findById(req.query.id);
 
 		if (!content) {
@@ -325,12 +294,10 @@ export const deleteContent = async (req, res) => {
 			});
 		}
 
-		// Delete image from Cloudinary if it exists
 		if (content.cloudinary_id) {
 			await cloudinary.uploader.destroy(content.cloudinary_id);
 		}
 
-		// Delete content from database
 		await Content.findByIdAndDelete(req.query.id);
 
 		return res.status(200).json({
@@ -349,35 +316,28 @@ export const deleteContent = async (req, res) => {
 // GET /api/admin/konten - Admin only route to get all content (including inactive)
 export const getAllContent = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
 		await connectDB();
 
-		// Build query based on filters
 		const query = {};
 
-		// Filter by contentType if provided
 		if (req.query.type) {
 			query.contentType = req.query.type;
 		}
 
-		// Filter by active status if provided
 		if (req.query.isActive !== undefined) {
 			query.isActive = req.query.isActive === "true";
 		}
 
-		// Filter by tag if provided
 		if (req.query.tag) {
 			query.tags = { $in: [req.query.tag] };
 		}
 
-		// Text search if provided
 		if (req.query.search) {
 			query.$or = [
 				{ title: { $regex: req.query.search, $options: "i" } },
@@ -386,13 +346,11 @@ export const getAllContent = async (req, res) => {
 			];
 		}
 
-		// Pagination
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 10;
 		const skip = (page - 1) * limit;
 
-		// Sort options
-		let sort = { createdAt: -1 }; // Default: newest first
+		let sort = { createdAt: -1 };
 
 		if (req.query.sort) {
 			switch (req.query.sort) {
@@ -411,14 +369,12 @@ export const getAllContent = async (req, res) => {
 			}
 		}
 
-		// Execute query with pagination
 		const content = await Content.find(query)
 			.populate("author", "username")
 			.sort(sort)
 			.skip(skip)
 			.limit(limit);
 
-		// Get total count for pagination info
 		const totalCount = await Content.countDocuments(query);
 
 		return res.status(200).json({
@@ -441,11 +397,9 @@ export const getAllContent = async (req, res) => {
 // GET /api/admin/konten/:id - Admin only route to get content by ID
 export const getContentById = async (req, res) => {
 	try {
-		// Authenticate admin
 		await authMiddleware(req, res);
 		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		// Check admin role
 		await roleCheck(["admin", "super_admin"])(req, res);
 		if (res.statusCode === 403) return;
 
@@ -479,7 +433,6 @@ export const getContentById = async (req, res) => {
 // Main handler function for API routes
 export default async function handler(req, res) {
 	try {
-		// Set CORS headers
 		res.setHeader("Access-Control-Allow-Credentials", "true");
 		res.setHeader("Access-Control-Allow-Origin", "*");
 		res.setHeader(
@@ -491,7 +444,6 @@ export default async function handler(req, res) {
 			"X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
 		);
 
-		// Handle OPTIONS requests (pre-flight)
 		if (req.method === "OPTIONS") {
 			res.status(200).end();
 			return;
@@ -505,7 +457,6 @@ export default async function handler(req, res) {
 			});
 		}
 
-		// Route handling based on HTTP method
 		switch (req.method) {
 			case "GET":
 				if (req.query.id) {

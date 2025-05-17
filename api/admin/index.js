@@ -1,8 +1,8 @@
 import connectDB from "../../lib/db.js";
 import Admin from "../../models/admin.js";
 import { authMiddleware, roleCheck } from "../../lib/auth.js";
+import formidable from "formidable";
 
-// Input validation
 const validateAdminInput = (data, isCreate = true) => {
 	const errors = {};
 
@@ -32,38 +32,51 @@ const validateAdminInput = (data, isCreate = true) => {
 };
 
 // Route protection middleware with timeout handling
-const protectRoute = (handler, roles = ["super-admin"]) => {
+export function protectRoute(handler, allowedRoles = []) {
 	return async (req, res) => {
-		// Set a timeout to prevent long-running functions
-		const timeoutPromise = new Promise((_, reject) =>
-			setTimeout(() => reject(new Error("Request timed out")), 25000)
-		);
+		const authResult = await authMiddleware(req);
 
-		try {
-			// Race between auth middleware and timeout
-			await Promise.race([authMiddleware(req, res), timeoutPromise]);
-
-			// Race between role check and timeout
-			await Promise.race([roleCheck(roles)(req, res), timeoutPromise]);
-
-			// Call the handler with timeout protection
-			return await Promise.race([handler(req, res), timeoutPromise]);
-		} catch (error) {
-			console.error("Route protection error:", error);
-
-			if (error.message === "Request timed out") {
-				return res.status(504).json({
-					success: false,
-					message: "Permintaan memakan waktu terlalu lama",
-				});
-			}
-
-			return res.status(500).json({
+		if (!authResult.ok) {
+			return res.status(401).json({
 				success: false,
-				message: "Terjadi kesalahan pada server",
+				message: authResult.error,
 			});
 		}
+
+		const role = req.admin.role;
+		if (!allowedRoles.includes(role)) {
+			return res.status(403).json({
+				success: false,
+				message: "Akses ditolak",
+			});
+		}
+
+		return handler(req, res);
 	};
+}
+
+// Parse form data using formidable
+const parseFormData = async (req) => {
+	const form = formidable({
+		multiples: true,
+		keepExtensions: true,
+	});
+
+	return new Promise((resolve, reject) => {
+		form.parse(req, (err, fields, files) => {
+			if (err) {
+				console.error("🔥 Formidable error:", err);
+				return reject(err);
+			}
+
+			const parsedFields = Object.keys(fields).reduce((acc, key) => {
+				acc[key] = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
+				return acc;
+			}, {});
+
+			resolve({ fields: parsedFields, files });
+		});
+	});
 };
 
 // Format admin response
@@ -77,7 +90,6 @@ const formatAdminResponse = (admin) => ({
 
 // Export main handler with connection management
 export default async function handler(req, res) {
-	// CORS
 	res.setHeader("Access-Control-Allow-Credentials", true);
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader(
@@ -95,32 +107,56 @@ export default async function handler(req, res) {
 	}
 
 	try {
-		// ✅ Panggil multer PALING AWAL
 		if (req.method === "POST" || req.method === "PUT") {
-			await new Promise((resolve, reject) => {
-				upload.single("gambar")(req, res, (err) => {
-					if (err) {
-						console.error("🔥 Multer early error:", err);
-						res.status(400).json({ success: false, message: err.message });
-						return reject(err);
-					}
-					resolve();
-				});
-			});
+			try {
+				const { fields, files } = await parseFormData(req);
 
-			// 🔍 DEBUGGING
-			console.log("📦 File received:", req.file);
-			console.log("📝 Body received:", req.body);
+				req.body = fields;
+
+				req.files = files;
+
+				console.log("Files received:", files);
+				console.log("Body received:", fields);
+			} catch (error) {
+				console.error("Form parsing error:", error);
+				return res.status(400).json({
+					success: false,
+					message: "Gagal memproses form data",
+				});
+			}
 		}
 
-		// ⏳ Koneksi DB (setelah multer)
+		if (req.method === "GET") {
+			try {
+				await connectDB();
+
+				const authResult = await authMiddleware(req);
+				if (!authResult.ok) {
+					return res.status(401).json({
+						success: false,
+						message: authResult.error,
+					});
+				}
+
+				const stats = await getDashboardStats();
+				return res.status(200).json({
+					success: true,
+					data: stats,
+				});
+			} catch (error) {
+				return res.status(500).json({
+					success: false,
+					message: "Server error",
+				});
+			}
+		}
+
 		const connectionPromise = connectDB();
 		const timeoutPromise = new Promise((_, reject) =>
 			setTimeout(() => reject(new Error("Database connection timed out")), 5000)
 		);
 		await Promise.race([connectionPromise, timeoutPromise]);
 
-		// ✅ Routing dengan protectRoute
 		switch (req.method) {
 			case "GET":
 				return protectRoute(handleGetAdmin, ["super-admin", "admin"])(req, res);
@@ -143,7 +179,7 @@ export default async function handler(req, res) {
 	}
 }
 
-// Handler functions (same as before, but with added error logging)
+// Handler functions
 const handleGetAdmin = async (req, res) => {
 	try {
 		const { id } = req.query;
@@ -234,7 +270,7 @@ const handleDeleteAdmin = async (req, res) => {
 	}
 };
 
-// Response helpers (unchanged)
+// Response helpers
 const successResponse = (res, data, count) =>
 	res.status(200).json({
 		success: true,
