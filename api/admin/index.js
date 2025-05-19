@@ -138,12 +138,24 @@ export default async function handler(req, res) {
 					});
 				}
 
-				const stats = await getDashboardStats();
+				// ✅ Jika akses ke /stats
+				if (req.url.includes("/stats")) {
+					const stats = await getDashboardStats(); // ← pastikan ini sudah kamu buat
+					return res.status(200).json({
+						success: true,
+						data: stats,
+					});
+				}
+
+				// ✅ Kalau bukan ke /stats → berarti ambil semua admin
+				const admins = await Admin.find().select("-password");
 				return res.status(200).json({
 					success: true,
-					data: stats,
+					count: admins.length,
+					data: admins,
 				});
 			} catch (error) {
+				console.error("Error admin GET:", error);
 				return res.status(500).json({
 					success: false,
 					message: "Server error",
