@@ -303,6 +303,125 @@ export const deleteProduct = async (req, res) => {
 	}
 };
 
+// GET /api/admin/produk - Admin only route to get all products
+export const getAllProducts = async (req, res) => {
+	try {
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
+
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
+
+		await connectDB();
+
+		const query = {};
+
+		if (req.query.kategori) {
+			query.kategori = req.query.kategori;
+		}
+
+		if (req.query.isForRent !== undefined) {
+			query.isForRent = req.query.isForRent === "true";
+		}
+
+		if (req.query.isForSale !== undefined) {
+			query.isForSale = req.query.isForSale === "true";
+		}
+
+		if (req.query.search) {
+			query.$or = [
+				{ namaProduk: { $regex: req.query.search, $options: "i" } },
+				{ deskripsi: { $regex: req.query.search, $options: "i" } },
+				{ kategori: { $regex: req.query.search, $options: "i" } },
+			];
+		}
+
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 10;
+		const skip = (page - 1) * limit;
+
+		let sort = { createdAt: -1 };
+
+		if (req.query.sort) {
+			switch (req.query.sort) {
+				case "harga_asc":
+					sort = { harga: 1 };
+					break;
+				case "harga_desc":
+					sort = { harga: -1 };
+					break;
+				case "namaProduk_asc":
+					sort = { namaProduk: 1 };
+					break;
+				case "namaProduk_desc":
+					sort = { namaProduk: -1 };
+					break;
+				case "stok_asc":
+					sort = { stok: 1 };
+					break;
+				case "stok_desc":
+					sort = { stok: -1 };
+					break;
+			}
+		}
+
+		const products = await Product.find(query)
+			.sort(sort)
+			.skip(skip)
+			.limit(limit);
+
+		const totalCount = await Product.countDocuments(query);
+
+		return res.status(200).json({
+			success: true,
+			count: products.length,
+			totalCount,
+			totalPages: Math.ceil(totalCount / limit),
+			currentPage: page,
+			data: products,
+		});
+	} catch (error) {
+		console.error("Error getting products:", error);
+		return res.status(500).json({
+			success: false,
+			message: "Terjadi kesalahan pada server",
+		});
+	}
+};
+
+// GET /api/admin/produk/:id - Admin only route to get product by ID
+export const getProductById = async (req, res) => {
+	try {
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
+
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
+
+		await connectDB();
+
+		const product = await Product.findById(req.query.id);
+
+		if (!product) {
+			return res.status(404).json({
+				success: false,
+				message: "Produk tidak ditemukan",
+			});
+		}
+
+		return res.status(200).json({
+			success: true,
+			data: product,
+		});
+	} catch (error) {
+		console.error("Error getting product:", error);
+		return res.status(500).json({
+			success: false,
+			message: "Terjadi kesalahan pada server",
+		});
+	}
+};
+
 // Main handler function for API routes
 export default async function handler(req, res) {
 	try {
@@ -323,6 +442,13 @@ export default async function handler(req, res) {
 		}
 
 		switch (req.method) {
+			case "GET":
+				if (req.query.id) {
+					await getProductById(req, res);
+				} else {
+					await getAllProducts(req, res);
+				}
+				break;
 			case "POST":
 				await createProduct(req, res);
 				break;
