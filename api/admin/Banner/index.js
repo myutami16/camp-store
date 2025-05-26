@@ -39,7 +39,7 @@ const uploadToCloudinary = async (filePath, mimetype) => {
 		const uploadResult = await cloudinary.uploader.upload(filePath, {
 			folder: "camping-store/banners",
 			transformation: [
-				{ width: 1200, height: 400, crop: "fill" }, // Optimized banner size
+				{ width: 1200, height: 400, crop: "fill" },
 				{ quality: "auto" },
 				{ format: "auto" },
 			],
@@ -55,36 +55,15 @@ const uploadToCloudinary = async (filePath, mimetype) => {
 	}
 };
 
-// Validate banner fields
-const validateBannerFields = (fields) => {
-	const location = fields.location?.[0];
-
-	if (!location) {
-		throw new Error("Lokasi banner wajib diisi");
-	}
-
-	if (!["homepage", "productpage"].includes(location)) {
-		throw new Error(
-			"Lokasi banner tidak valid. Pilih: homepage atau productpage"
-		);
-	}
-
-	return { location };
-};
-
 // POST /api/admin/banner - Admin only route to create banner
 export const createBanner = async (req, res) => {
 	try {
-		const authResult = await authMiddleware(req);
-		if (!authResult.ok) {
-			return res.status(401).json({
-				success: false,
-				message: authResult.error,
-			});
-		}
+		// Use consistent auth pattern like produk and konten
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		const roleResult = roleCheck(["admin", "super_admin"])(req, res);
-		if (roleResult !== true) return;
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
 
 		await connectDB();
 
@@ -105,19 +84,22 @@ export const createBanner = async (req, res) => {
 			});
 		}
 
-		// Validate fields
-		let validatedFields;
-		try {
-			validatedFields = validateBannerFields(fields);
-		} catch (validateError) {
+		const location = fields.location?.[0];
+		const isActive = fields.isActive?.[0] !== "false";
+
+		if (!location) {
 			return res.status(400).json({
 				success: false,
-				message: validateError.message,
+				message: "Lokasi banner wajib diisi",
 			});
 		}
 
-		const { location } = validatedFields;
-		const isActive = fields.isActive?.[0] !== "false"; // Default true
+		if (!["homepage", "productpage"].includes(location)) {
+			return res.status(400).json({
+				success: false,
+				message: "Lokasi banner tidak valid. Pilih: homepage atau productpage",
+			});
+		}
 
 		// Check banner count limit per location
 		const count = await Banner.countDocuments({ location });
@@ -134,14 +116,6 @@ export const createBanner = async (req, res) => {
 			return res.status(400).json({
 				success: false,
 				message: "File gambar banner wajib diupload",
-			});
-		}
-
-		// Check file size (additional check)
-		if (imageFile.size > 500 * 1024) {
-			return res.status(400).json({
-				success: false,
-				message: "Ukuran file maksimal 500KB",
 			});
 		}
 
@@ -190,16 +164,11 @@ export const createBanner = async (req, res) => {
 // PUT /api/admin/banner/:id - Admin only route to update banner
 export const updateBanner = async (req, res) => {
 	try {
-		const authResult = await authMiddleware(req);
-		if (!authResult.ok) {
-			return res.status(401).json({
-				success: false,
-				message: authResult.error,
-			});
-		}
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		const roleResult = roleCheck(["admin", "super_admin"])(req, res);
-		if (roleResult !== true) return;
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
 
 		await connectDB();
 
@@ -257,14 +226,6 @@ export const updateBanner = async (req, res) => {
 		// Handle image update if provided
 		const imageFile = files.image?.[0];
 		if (imageFile) {
-			// Check file size
-			if (imageFile.size > 500 * 1024) {
-				return res.status(400).json({
-					success: false,
-					message: "Ukuran file maksimal 500KB",
-				});
-			}
-
 			try {
 				// Delete old image from Cloudinary
 				if (banner.cloudinary_id) {
@@ -326,16 +287,11 @@ export const updateBanner = async (req, res) => {
 // DELETE /api/admin/banner/:id - Admin only route to delete banner
 export const deleteBanner = async (req, res) => {
 	try {
-		const authResult = await authMiddleware(req);
-		if (!authResult.ok) {
-			return res.status(401).json({
-				success: false,
-				message: authResult.error,
-			});
-		}
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		const roleResult = roleCheck(["admin", "super_admin"])(req, res);
-		if (roleResult !== true) return;
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
 
 		await connectDB();
 
@@ -376,16 +332,11 @@ export const deleteBanner = async (req, res) => {
 // GET /api/admin/banner - Admin only route to get all banners
 export const getAllBanners = async (req, res) => {
 	try {
-		const authResult = await authMiddleware(req);
-		if (!authResult.ok) {
-			return res.status(401).json({
-				success: false,
-				message: authResult.error,
-			});
-		}
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		const roleResult = roleCheck(["admin", "super_admin"])(req, res);
-		if (roleResult !== true) return;
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
 
 		await connectDB();
 
@@ -446,16 +397,11 @@ export const getAllBanners = async (req, res) => {
 // GET /api/admin/banner/:id - Admin only route to get banner by ID
 export const getBannerById = async (req, res) => {
 	try {
-		const authResult = await authMiddleware(req);
-		if (!authResult.ok) {
-			return res.status(401).json({
-				success: false,
-				message: authResult.error,
-			});
-		}
+		await authMiddleware(req, res);
+		if (res.statusCode === 401 || res.statusCode === 403) return;
 
-		const roleResult = roleCheck(["admin", "super_admin"])(req, res);
-		if (roleResult !== true) return;
+		await roleCheck(["admin", "super_admin"])(req, res);
+		if (res.statusCode === 403) return;
 
 		await connectDB();
 
@@ -501,7 +447,7 @@ export default async function handler(req, res) {
 		}
 
 		// Rate limiting
-		const allowed = await rateLimit(req, res, 20); // max 20 req/IP/menit for admin
+		const allowed = await rateLimit(req, res, 20);
 		if (!allowed) {
 			return res.status(429).json({
 				success: false,
