@@ -25,7 +25,9 @@ const parseForm = async (req) => {
 
 		form.parse(req, (err, fields, files) => {
 			if (err) {
-				console.error("Form parsing error:", err);
+				if (err.code === "LIMIT_FILE_SIZE") {
+					return reject(new Error("Ukuran file melebihi 500KB"));
+				}
 				return reject(err);
 			}
 			resolve({ fields, files });
@@ -154,129 +156,6 @@ export const createBanner = async (req, res) => {
 		}
 	} catch (error) {
 		console.error("Error creating banner:", error);
-		return res.status(500).json({
-			success: false,
-			message: "Terjadi kesalahan pada server",
-		});
-	}
-};
-
-// PUT /api/admin/banner/:id - Admin only route to update banner
-export const updateBanner = async (req, res) => {
-	try {
-		await authMiddleware(req, res);
-		if (res.statusCode === 401 || res.statusCode === 403) return;
-
-		await roleCheck(["admin", "super_admin"])(req, res);
-		if (res.statusCode === 403) return;
-
-		await connectDB();
-
-		const banner = await Banner.findById(req.query.id);
-		if (!banner) {
-			return res.status(404).json({
-				success: false,
-				message: "Banner tidak ditemukan",
-			});
-		}
-
-		let fields, files;
-		try {
-			const formData = await parseForm(req);
-			fields = formData.fields;
-			files = formData.files;
-		} catch (err) {
-			console.error("Form parsing error:", err);
-			return res.status(400).json({
-				success: false,
-				message: err.message || "Error parsing form data",
-			});
-		}
-
-		const updateData = {};
-
-		// Update location if provided
-		if (fields.location?.[0]) {
-			const newLocation = fields.location[0];
-			if (!["homepage", "productpage"].includes(newLocation)) {
-				return res.status(400).json({
-					success: false,
-					message: "Lokasi banner tidak valid",
-				});
-			}
-
-			// Check if changing location would exceed limit
-			if (newLocation !== banner.location) {
-				const count = await Banner.countDocuments({ location: newLocation });
-				if (count >= 5) {
-					return res.status(400).json({
-						success: false,
-						message: `Maksimal 5 banner per lokasi. ${newLocation} sudah memiliki ${count} banner.`,
-					});
-				}
-			}
-			updateData.location = newLocation;
-		}
-
-		// Update isActive status
-		if (fields.isActive !== undefined) {
-			updateData.isActive = fields.isActive[0] !== "false";
-		}
-
-		// Handle image update if provided
-		const imageFile = files.image?.[0];
-		if (imageFile) {
-			try {
-				// Delete old image from Cloudinary
-				if (banner.cloudinary_id) {
-					await cloudinary.uploader.destroy(banner.cloudinary_id);
-				}
-
-				// Upload new image
-				const { url, public_id } = await uploadToCloudinary(
-					imageFile.filepath,
-					imageFile.mimetype
-				);
-
-				updateData.image = url;
-				updateData.cloudinary_id = public_id;
-			} catch (uploadError) {
-				console.error("Error updating image:", uploadError);
-				return res.status(500).json({
-					success: false,
-					message: "Gagal mengupdate gambar banner",
-				});
-			} finally {
-				// Clean up temp file
-				if (imageFile.filepath) {
-					fs.unlink(imageFile.filepath, (err) => {
-						if (err) console.error("Error deleting temp file:", err);
-					});
-				}
-			}
-		}
-
-		try {
-			const updatedBanner = await Banner.findByIdAndUpdate(
-				req.query.id,
-				updateData,
-				{ new: true, runValidators: true }
-			);
-
-			return res.status(200).json({
-				success: true,
-				message: "Banner berhasil diupdate",
-				data: updatedBanner,
-			});
-		} catch (updateError) {
-			console.error("Error updating banner:", updateError);
-			return res.status(500).json({
-				success: false,
-				message: updateError.message || "Gagal mengupdate banner",
-			});
-		}
-	} catch (error) {
-		console.error("Error updating banner:", error);
 		return res.status(500).json({
 			success: false,
 			message: "Terjadi kesalahan pada server",
@@ -432,10 +311,7 @@ export default async function handler(req, res) {
 		// Set CORS headers
 		res.setHeader("Access-Control-Allow-Credentials", "true");
 		res.setHeader("Access-Control-Allow-Origin", "*");
-		res.setHeader(
-			"Access-Control-Allow-Methods",
-			"GET, OPTIONS, PATCH, DELETE, POST, PUT"
-		);
+		res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS, DELETE, POST");
 		res.setHeader(
 			"Access-Control-Allow-Headers",
 			"X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
@@ -465,9 +341,6 @@ export default async function handler(req, res) {
 				break;
 			case "POST":
 				await createBanner(req, res);
-				break;
-			case "PUT":
-				await updateBanner(req, res);
 				break;
 			case "DELETE":
 				await deleteBanner(req, res);

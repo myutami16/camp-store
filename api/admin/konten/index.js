@@ -17,7 +17,7 @@ const parseForm = async (req) => {
 	return new Promise((resolve, reject) => {
 		const form = new IncomingForm({
 			keepExtensions: true,
-			maxFileSize: 5 * 1024 * 1024,
+			maxFileSize: 500 * 1024,
 			filter: (part) => {
 				return part.mimetype === "image/jpeg" || part.mimetype === "image/png";
 			},
@@ -25,7 +25,9 @@ const parseForm = async (req) => {
 
 		form.parse(req, (err, fields, files) => {
 			if (err) {
-				console.error("Form parsing error:", err);
+				if (err.code === "LIMIT_FILE_SIZE") {
+					return reject(new Error("Ukuran file melebihi 500KB"));
+				}
 				return reject(err);
 			}
 			resolve({ fields, files });

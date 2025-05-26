@@ -1,6 +1,9 @@
 <<<<<<< HEAD
+
 # camp-store
+
 =======
+
 # API Documentation
 
 # Overview
@@ -645,6 +648,222 @@ Remove content (admin only).
   }
   ```
 
+# Banner Management API
+
+API ini digunakan untuk mengelola banner yang ditampilkan di halaman `homepage` atau `productpage`. Terdapat endpoint untuk admin (CRUD) dan juga endpoint publik untuk menampilkan banner yang aktif.
+
+## Admin Endpoints
+
+### Create Banner
+
+URL: `/api/admin/banner`  
+Method: `POST`  
+Auth: Required (Bearer Token)
+
+Request (multipart/form-data):
+
+```
+
+image: file (JPEG/PNG) — required
+location: "homepage" | "productpage" — required
+isActive: true | false — optional (default: true)
+
+```
+
+Response:
+
+```json
+{
+	"success": true,
+	"message": "Banner berhasil dibuat",
+	"data": {
+		"_id": "664d0379f9f92900125e4981",
+		"image": "https://res.cloudinary.com/xxx.jpg",
+		"location": "homepage",
+		"isActive": true,
+		"createdAt": "2025-05-24T10:12:00.000Z"
+	}
+}
+```
+
+---
+
+### 📄 Get All Banners (Admin)
+
+URL: `/api/admin/banner`
+Method: `GET`
+Auth: Required
+
+Query Parameters:
+
+`location`: (optional) `"homepage"` / `"productpage"`
+`isActive`: (optional) `true` / `false`
+`page`: default `1`
+`limit`: default `20`
+
+Response:
+
+```json
+{
+  "success": true,
+  "count": 5,
+  "totalCount": 10,
+  "totalPages": 2,
+  "currentPage": 1,
+  "locationStats": {
+    "homepage": { "total": 5, "active": 3 },
+    "productpage": { "total": 5, "active": 5 }
+  },
+  "data": [...]
+}
+```
+
+---
+
+### Get Banner by ID
+
+URL: `/api/admin/banner?id={id}`
+Method: `GET`
+Auth: Required
+
+Response:
+
+```json
+{
+	"success": true,
+	"data": {
+		"_id": "664d0379f9f92900125e4981",
+		"image": "https://res.cloudinary.com/xxx.jpg",
+		"location": "homepage",
+		"isActive": true
+	}
+}
+```
+
+---
+
+### Update Banner
+
+URL: `/api/admin/banner?id={id}`
+Method: `PUT`
+Auth: Required
+
+Request (multipart/form-data):
+
+```
+image: file (optional)
+location: "homepage" | "productpage" (optional)
+isActive: true | false (optional)
+```
+
+Response:
+
+```json
+{
+	"success": true,
+	"message": "Banner berhasil diupdate",
+	"data": {
+		"_id": "664d0379f9f92900125e4981",
+		"location": "productpage",
+		"isActive": false,
+		"image": "https://res.cloudinary.com/new-image.jpg"
+	}
+}
+```
+
+---
+
+### Delete Banner
+
+URL: `/api/admin/banner?id={id}`
+Method: `DELETE`
+Auth: Required
+
+Response:
+
+```json
+{
+	"success": true,
+	"message": "Banner berhasil dihapus"
+}
+```
+
+---
+
+## Public Endpoints
+
+### Get Banners by Location
+
+URL: `/api/banner?location=homepage`
+Method: `GET`
+Auth: Not required
+
+Query Parameters:
+
+`location`: `homepage` | `productpage`
+`limit`: default `5`
+
+Response:
+
+```json
+{
+	"success": true,
+	"count": 2,
+	"location": "homepage",
+	"data": [
+		{
+			"_id": "664d0379f9f92900125e4981",
+			"image": "https://res.cloudinary.com/xxx.jpg",
+			"location": "homepage",
+			"isActive": true
+		}
+	]
+}
+```
+
+---
+
+### Get Banner Locations with Counts
+
+URL: `/api/banner?path=locations`
+Method: `GET`
+Auth: Not required
+
+Response:
+
+```json
+{
+	"success": true,
+	"count": 2,
+	"data": [
+		{ "location": "homepage", "count": 3 },
+		{ "location": "productpage", "count": 2 }
+	]
+}
+```
+
+---
+
+## Notes
+
+Maksimal 5 banner per lokasi (`homepage` / `productpage`)
+File gambar harus berformat `.jpg` atau `.png`
+Admin diotorisasi menggunakan middleware token JWT dan role-checking
+Gambar disimpan di Cloudinary
+
+---
+
+## Status & Error Format
+
+Jika terjadi error, respons akan seperti ini:
+
+```json
+{
+	"success": false,
+	"message": "Pesan error yang menjelaskan masalah"
+}
+```
+
 # Error Responses
 
 # Authentication Errors
@@ -710,4 +929,5 @@ or
 	"message": "Internal server error"
 }
 ```
->>>>>>> develop
+
+> > > > > > > develop
