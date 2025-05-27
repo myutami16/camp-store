@@ -656,7 +656,7 @@ API ini digunakan untuk mengelola banner yang ditampilkan di halaman `homepage` 
 
 ### Create Banner
 
-URL: `/api/admin/banner`  
+URL: `/api/admin/Banner`  
 Method: `POST`  
 Auth: Required (Bearer Token)
 
@@ -690,7 +690,7 @@ Response:
 
 ### 📄 Get All Banners (Admin)
 
-URL: `/api/admin/banner`
+URL: `/api/admin/Banner`
 Method: `GET`
 Auth: Required
 
@@ -722,7 +722,7 @@ Response:
 
 ### Get Banner by ID
 
-URL: `/api/admin/banner?id={id}`
+URL: `/api/admin/Banner?id={id}`
 Method: `GET`
 Auth: Required
 
@@ -739,39 +739,6 @@ Response:
 	}
 }
 ```
-
----
-
-### Update Banner
-
-URL: `/api/admin/banner?id={id}`
-Method: `PUT`
-Auth: Required
-
-Request (multipart/form-data):
-
-```
-image: file (optional)
-location: "homepage" | "productpage" (optional)
-isActive: true | false (optional)
-```
-
-Response:
-
-```json
-{
-	"success": true,
-	"message": "Banner berhasil diupdate",
-	"data": {
-		"_id": "664d0379f9f92900125e4981",
-		"location": "productpage",
-		"isActive": false,
-		"image": "https://res.cloudinary.com/new-image.jpg"
-	}
-}
-```
-
----
 
 ### Delete Banner
 
