@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-
-# camp-store
-
-=======
-
 # API Documentation
 
 # Overview
@@ -761,7 +755,7 @@ Response:
 
 ### Get Banners by Location
 
-URL: `/api/banner?location=homepage`
+URL: `/api/banners?location=homepage`
 Method: `GET`
 Auth: Not required
 
@@ -792,7 +786,7 @@ Response:
 
 ### Get Banner Locations with Counts
 
-URL: `/api/banner?path=locations`
+URL: `/api/banners?path=locations`
 Method: `GET`
 Auth: Not required
 
