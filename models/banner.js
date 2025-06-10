@@ -15,6 +15,12 @@ const BannerSchema = new mongoose.Schema(
 			enum: ["homepage", "productpage"],
 			required: true,
 		},
+		targetUrl: {
+			type: String,
+			required: false,
+			trim: true,
+		},
+
 		isActive: {
 			type: Boolean,
 			default: true,
