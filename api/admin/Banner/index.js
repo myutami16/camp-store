@@ -87,6 +87,7 @@ export const createBanner = async (req, res) => {
 		}
 
 		const location = fields.location?.[0];
+		const targetUrl = fields.targetUrl?.[0] || ""; // Add this line to extract targetUrl
 		const isActive = fields.isActive?.[0] !== "false";
 
 		if (!location) {
@@ -127,11 +128,12 @@ export const createBanner = async (req, res) => {
 				imageFile.mimetype
 			);
 
-			// Create new banner
+			// Create new banner with targetUrl included
 			const banner = await Banner.create({
 				image: url,
 				cloudinary_id: public_id,
 				location,
+				targetUrl,
 				isActive,
 			});
 
