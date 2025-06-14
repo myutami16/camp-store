@@ -40,11 +40,7 @@ const uploadToCloudinary = async (filePath, mimetype) => {
 	try {
 		const uploadResult = await cloudinary.uploader.upload(filePath, {
 			folder: "camping-store/banners",
-			transformation: [
-				{ width: 1200, height: 400, crop: "fill" },
-				{ quality: "auto" },
-				{ format: "auto" },
-			],
+			transformation: [{ quality: "auto" }, { format: "auto" }],
 		});
 
 		return {
