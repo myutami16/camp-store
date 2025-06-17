@@ -4,6 +4,7 @@ import { authMiddleware, roleCheck } from "../../../lib/auth.js";
 import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
+import sanitizeHtml from "sanitize-html";
 
 export const config = {
 	api: {
@@ -79,13 +80,13 @@ export const createProduct = async (req, res) => {
 			});
 		}
 
-		const namaProduk = fields.namaProduk?.[0];
-		const deskripsi = fields.deskripsi?.[0];
+		let namaProduk = fields.namaProduk?.[0];
+		let deskripsi = fields.deskripsi?.[0];
 		const harga = fields.harga?.[0];
 		const stok = fields.stok?.[0];
 		const isForRent = fields.isForRent?.[0] || "false";
 		const isForSale = fields.isForSale?.[0] || "true";
-		const kategori = fields.kategori?.[0];
+		let kategori = fields.kategori?.[0];
 
 		if (!namaProduk || !deskripsi || !harga || !stok || !kategori) {
 			return res.status(400).json({
@@ -93,6 +94,22 @@ export const createProduct = async (req, res) => {
 				message: "Semua field wajib diisi",
 			});
 		}
+
+		// Sanitize text fields
+		namaProduk = sanitizeHtml(namaProduk, {
+			allowedTags: [],
+			allowedAttributes: {},
+		});
+
+		deskripsi = sanitizeHtml(deskripsi, {
+			allowedTags: ["p", "strong", "em", "ul", "ol", "li", "br"],
+			allowedAttributes: {},
+		});
+
+		kategori = sanitizeHtml(kategori, {
+			allowedTags: [],
+			allowedAttributes: {},
+		});
 
 		if (isForRent === "false" && isForSale === "false") {
 			return res.status(400).json({
@@ -188,9 +205,26 @@ export const updateProduct = async (req, res) => {
 
 		const updateData = {};
 
-		if (fields.namaProduk?.[0]) updateData.namaProduk = fields.namaProduk[0];
-		if (fields.deskripsi?.[0]) updateData.deskripsi = fields.deskripsi[0];
-		if (fields.kategori?.[0]) updateData.kategori = fields.kategori[0];
+		if (fields.namaProduk?.[0]) {
+			updateData.namaProduk = sanitizeHtml(fields.namaProduk[0], {
+				allowedTags: [],
+				allowedAttributes: {},
+			});
+		}
+
+		if (fields.deskripsi?.[0]) {
+			updateData.deskripsi = sanitizeHtml(fields.deskripsi[0], {
+				allowedTags: ["p", "strong", "em", "ul", "ol", "li", "br"],
+				allowedAttributes: {},
+			});
+		}
+
+		if (fields.kategori?.[0]) {
+			updateData.kategori = sanitizeHtml(fields.kategori[0], {
+				allowedTags: [],
+				allowedAttributes: {},
+			});
+		}
 
 		if (fields.harga?.[0]) updateData.harga = Number(fields.harga[0]);
 		if (fields.stok?.[0]) updateData.stok = Number(fields.stok[0]);

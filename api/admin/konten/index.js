@@ -5,6 +5,7 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Content from "../../../models/content.js";
 import fs from "fs";
 import rateLimit from "../../../lib/rateLimit.js";
+import sanitizeHtml from "sanitize-html";
 
 export const config = {
 	api: {
@@ -52,6 +53,23 @@ const uploadToCloudinary = async (filePath, mimetype) => {
 	}
 };
 
+// Helper function to sanitize input
+const sanitizeInput = (input, isRichText = false) => {
+	if (!input) return input;
+
+	if (isRichText) {
+		return sanitizeHtml(input, {
+			allowedTags: ["p", "strong", "em", "ul", "ol", "li", "br", "b", "i", "u"],
+			allowedAttributes: {},
+		});
+	}
+
+	return sanitizeHtml(input, {
+		allowedTags: [],
+		allowedAttributes: {},
+	});
+};
+
 // POST /api/admin/konten - Admin only route to create content
 export const createContent = async (req, res) => {
 	try {
@@ -80,12 +98,14 @@ export const createContent = async (req, res) => {
 			});
 		}
 
-		const title = fields.title?.[0];
-		const description = fields.description?.[0];
-		const contentType = fields.contentType?.[0];
-		const summary = fields.summary?.[0] || "";
+		const title = sanitizeInput(fields.title?.[0]);
+		const description = sanitizeInput(fields.description?.[0], true);
+		const contentType = sanitizeInput(fields.contentType?.[0]);
+		const summary = sanitizeInput(fields.summary?.[0] || "");
 
-		const tags = fields.tags?.[0] ? JSON.parse(fields.tags[0]) : [];
+		const tags = fields.tags?.[0]
+			? JSON.parse(fields.tags[0]).map((tag) => sanitizeInput(tag))
+			: [];
 		const publishDate = fields.publishDate?.[0]
 			? new Date(fields.publishDate[0])
 			: new Date();
@@ -191,14 +211,19 @@ export const updateContent = async (req, res) => {
 
 		const updateData = {};
 
-		if (fields.title?.[0]) updateData.title = fields.title[0];
-		if (fields.description?.[0]) updateData.description = fields.description[0];
-		if (fields.contentType?.[0]) updateData.contentType = fields.contentType[0];
-		if (fields.summary?.[0]) updateData.summary = fields.summary[0];
+		if (fields.title?.[0]) updateData.title = sanitizeInput(fields.title[0]);
+		if (fields.description?.[0])
+			updateData.description = sanitizeInput(fields.description[0], true);
+		if (fields.contentType?.[0])
+			updateData.contentType = sanitizeInput(fields.contentType[0]);
+		if (fields.summary?.[0])
+			updateData.summary = sanitizeInput(fields.summary[0]);
 
 		if (fields.tags?.[0]) {
 			try {
-				updateData.tags = JSON.parse(fields.tags[0]);
+				updateData.tags = JSON.parse(fields.tags[0]).map((tag) =>
+					sanitizeInput(tag)
+				);
 			} catch (e) {
 				return res.status(400).json({
 					success: false,
