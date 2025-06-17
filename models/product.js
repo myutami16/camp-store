@@ -52,6 +52,7 @@ const ProductSchema = new mongoose.Schema({
 				"Pisau Lipat & Peralatan Survival",
 				"Aksesori Tambahan",
 				"Paket Komplit Camping",
+				"Paket Komplit Adzra Camp",
 				"Lain-lain",
 			],
 			message: "Kategori {VALUE} tidak tersedia",
