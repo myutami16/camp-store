@@ -105,6 +105,12 @@ export default async function handler(req, res) {
 		});
 	}
 
+	// Set cache headers for GET requests
+	res.setHeader(
+		"Cache-Control",
+		"public, max-age=60, stale-while-revalidate=300"
+	);
+
 	// Route handling
 	try {
 		if (req.query.path === "locations") {

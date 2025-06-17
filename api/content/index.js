@@ -205,6 +205,11 @@ export default async function handler(req, res) {
 	}
 
 	if (req.method === "GET") {
+		res.setHeader(
+			"Cache-Control",
+			"public, max-age=60, stale-while-revalidate=300"
+		);
+
 		if (req.query.path === "types") {
 			return await getContentTypes(req, res);
 		} else if (req.query.path === "tags") {
