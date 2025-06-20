@@ -41,15 +41,15 @@ const ProductSchema = new mongoose.Schema({
 		enum: {
 			values: [
 				"Tenda Camping",
-				"Matras & Sleeping Kit",
+				"Matras dan Sleeping Kit",
 				"Sleeping Bag",
-				"Carrier & Daypack",
-				"Flysheet & Aksesorinya",
-				"Meja & Kursi Lipat",
-				"Peralatan Masak Outdoor & Grill Kit",
+				"Carrier dan Daypack",
+				"Flysheet dan Aksesorinya",
+				"Meja dan Kursi Lipat",
+				"Peralatan Masak Outdoor dan Grill Kit",
 				"Trekking Pole",
-				"Lampu & Penerangan Outdoor",
-				"Pisau Lipat & Peralatan Survival",
+				"Lampu dan Penerangan Outdoor",
+				"Pisau Lipat dan Peralatan Survival",
 				"Aksesori Tambahan",
 				"Paket Komplit Camping",
 				"Paket Komplit Adzra Camp",
@@ -66,13 +66,11 @@ const ProductSchema = new mongoose.Schema({
 		type: Date,
 		default: Date.now,
 	},
-
 	cloudinary_id: {
 		type: String,
 	},
 });
 
-// Middleware slug otomatis
 ProductSchema.pre("save", function (next) {
 	if (this.isModified("namaProduk") || this.isNew) {
 		const baseSlug = slugify(this.namaProduk, {
@@ -90,7 +88,6 @@ ProductSchema.pre("save", function (next) {
 	next();
 });
 
-// Validasi update
 ProductSchema.pre("findOneAndUpdate", function (next) {
 	const update = this.getUpdate();
 	if (update.isForRent === false && update.isForSale === false) {
@@ -100,7 +97,6 @@ ProductSchema.pre("findOneAndUpdate", function (next) {
 	next();
 });
 
-// Static methods
 ProductSchema.statics.findByCategory = function (category) {
 	return this.find({ kategori: category });
 };
