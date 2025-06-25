@@ -5,6 +5,7 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
 import sanitizeHtml from "sanitize-html";
+import { invalidateProductCache } from "../../../lib/cache.js";
 
 export const config = {
 	api: {
@@ -144,6 +145,9 @@ export const createProduct = async (req, res) => {
 				cloudinary_id: public_id,
 			});
 
+			console.log("🔄 Triggering revalidation after product creation...");
+			invalidateProductCache();
+
 			return res.status(201).json({
 				success: true,
 				data: product,
@@ -280,6 +284,9 @@ export const updateProduct = async (req, res) => {
 				{ new: true, runValidators: true }
 			);
 
+			console.log("🔄 Triggering revalidation after product creation...");
+			invalidateProductCache();
+
 			return res.status(200).json({
 				success: true,
 				data: updatedProduct,
@@ -325,6 +332,9 @@ export const deleteProduct = async (req, res) => {
 		}
 
 		await Product.findByIdAndDelete(req.query.id);
+
+		console.log("🔄 Triggering revalidation after product creation...");
+		invalidateProductCache();
 
 		return res.status(200).json({
 			success: true,
