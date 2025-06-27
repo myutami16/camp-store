@@ -133,10 +133,10 @@ export default async function handler(req, res) {
 	}
 
 	if (req.method === "GET") {
-		res.setHeader(
-			"Cache-Control",
-			"public, max-age=60, stale-while-revalidate=300"
-		);
+		// res.setHeader(
+		// 	"Cache-Control",
+		// 	"public, max-age=60, stale-while-revalidate=300"
+		// );
 
 		await connectDB();
 		if (req.query.q) {
