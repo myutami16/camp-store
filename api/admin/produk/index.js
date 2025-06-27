@@ -5,7 +5,10 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
 import sanitizeHtml from "sanitize-html";
-import { invalidateProductCache } from "../../../lib/cache.js";
+import {
+	invalidateProductCache,
+	invalidateProductByIdOrSlug,
+} from "../../../lib/product-cache.js";
 
 export const config = {
 	api: {
@@ -285,7 +288,7 @@ export const updateProduct = async (req, res) => {
 			);
 
 			console.log("🔄 Triggering revalidation after product creation...");
-			invalidateProductCache();
+			invalidateProductByIdOrSlug(req.query.id || product.slug);
 
 			return res.status(200).json({
 				success: true,
@@ -334,7 +337,7 @@ export const deleteProduct = async (req, res) => {
 		await Product.findByIdAndDelete(req.query.id);
 
 		console.log("🔄 Triggering revalidation after product creation...");
-		invalidateProductCache();
+		invalidateProductByIdOrSlug(req.query.id || product.slug);
 
 		return res.status(200).json({
 			success: true,
