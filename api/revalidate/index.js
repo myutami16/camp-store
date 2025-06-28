@@ -9,20 +9,17 @@ export default async function handler(req, res) {
 
 	// Debug logging
 	console.log("🔍 Headers received:", req.headers.authorization);
-	console.log(
-		"🔍 Expected token:",
-		process.env.REVALIDATE_SECRET_TOKEN?.substring(0, 10) + "..."
-	);
+	console.log("🔍 Expected token:", "adzracamp-revalidate-token-2025");
 
 	const authHeader = req.headers.authorization;
 	const token = authHeader?.split(" ")[1];
 
-	console.log("🔍 Extracted token:", token?.substring(0, 10) + "...");
+	console.log("🔍 Extracted token:", token);
 
-	if (token !== process.env.REVALIDATE_SECRET_TOKEN) {
+	if (token !== "adzracamp-revalidate-token-2025") {
 		console.log("❌ Token mismatch!");
 		console.log("❌ Received token full:", token);
-		console.log("❌ Expected token full:", process.env.REVALIDATE_SECRET_TOKEN);
+		console.log("❌ Expected token full:", "adzracamp-revalidate-token-2025");
 		return res.status(401).json({ success: false, message: "Unauthorized" });
 	}
 
