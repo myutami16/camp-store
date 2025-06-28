@@ -1,4 +1,4 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache.js";
 
 export default async function handler(req, res) {
 	if (req.method !== "POST") {
