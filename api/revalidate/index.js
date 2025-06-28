@@ -7,10 +7,22 @@ export default async function handler(req, res) {
 			.json({ success: false, message: "Method not allowed" });
 	}
 
+	// Debug logging
+	console.log("🔍 Headers received:", req.headers.authorization);
+	console.log(
+		"🔍 Expected token:",
+		process.env.REVALIDATE_SECRET_TOKEN?.substring(0, 10) + "..."
+	);
+
 	const authHeader = req.headers.authorization;
 	const token = authHeader?.split(" ")[1];
 
+	console.log("🔍 Extracted token:", token?.substring(0, 10) + "...");
+
 	if (token !== process.env.REVALIDATE_SECRET_TOKEN) {
+		console.log("❌ Token mismatch!");
+		console.log("❌ Received token full:", token);
+		console.log("❌ Expected token full:", process.env.REVALIDATE_SECRET_TOKEN);
 		return res.status(401).json({ success: false, message: "Unauthorized" });
 	}
 
