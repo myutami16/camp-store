@@ -1,3 +1,4 @@
+// api/admin/produk/index.js (Updated with revalidation)
 import { IncomingForm } from "formidable";
 import connectDB from "../../../lib/db.js";
 import { authMiddleware, roleCheck } from "../../../lib/auth.js";
@@ -5,6 +6,10 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
 import sanitizeHtml from "sanitize-html";
+import {
+	revalidateProducts,
+	revalidateProductBySlug,
+} from "../../../lib/revalidation_actions.js";
 
 export const config = {
 	api: {
@@ -144,6 +149,14 @@ export const createProduct = async (req, res) => {
 				cloudinary_id: public_id,
 			});
 
+			// ✅ Enhanced revalidation after creating product
+			await revalidateProducts(); // Revalidate listing and all detail pages
+
+			// ✅ Also revalidate the specific product detail page
+			if (product.slug) {
+				await revalidateProductBySlug(product.slug);
+			}
+
 			return res.status(201).json({
 				success: true,
 				data: product,
@@ -189,6 +202,9 @@ export const updateProduct = async (req, res) => {
 				message: "Produk tidak ditemukan",
 			});
 		}
+
+		// Store old slug for revalidation
+		const oldSlug = product.slug;
 
 		let fields, files;
 		try {
@@ -280,6 +296,24 @@ export const updateProduct = async (req, res) => {
 				{ new: true, runValidators: true }
 			);
 
+			// ✅ Enhanced revalidation after updating product
+			await revalidateProducts(); // Revalidate listing and all detail pages
+
+			// ✅ Revalidate old slug if it exists
+			if (oldSlug) {
+				await revalidateProductBySlug(oldSlug);
+			}
+
+			// ✅ Revalidate new slug if it changed
+			if (updatedProduct.slug && updatedProduct.slug !== oldSlug) {
+				await revalidateProductBySlug(updatedProduct.slug);
+			}
+
+			// ✅ If slug didn't change, still revalidate the current slug
+			if (updatedProduct.slug && updatedProduct.slug === oldSlug) {
+				await revalidateProductBySlug(updatedProduct.slug);
+			}
+
 			return res.status(200).json({
 				success: true,
 				data: updatedProduct,
@@ -320,11 +354,31 @@ export const deleteProduct = async (req, res) => {
 			});
 		}
 
+		// ✅ Store slug and category for revalidation
+		const productSlug = product.slug;
+		const productCategory = product.kategori;
+
 		if (product.cloudinary_id) {
 			await cloudinary.uploader.destroy(product.cloudinary_id);
 		}
 
 		await Product.findByIdAndDelete(req.query.id);
+
+		// ✅ Enhanced revalidation after deleting product
+		await revalidateProducts(); // Revalidate listing and all detail pages
+
+		// ✅ Revalidate specific product page if slug exists
+		if (productSlug) {
+			await revalidateProductBySlug(productSlug);
+		}
+
+		// ✅ Additional revalidation for category if needed
+		if (productCategory) {
+			// You can add category-specific revalidation here
+			revalidateTag(
+				`category-${productCategory.toLowerCase().replace(/\s+/g, "-")}`
+			);
+		}
 
 		return res.status(200).json({
 			success: true,
