@@ -1,4 +1,3 @@
-// api/admin/produk/index.js (Updated with revalidation)
 import { IncomingForm } from "formidable";
 import connectDB from "../../../lib/db.js";
 import { authMiddleware, roleCheck } from "../../../lib/auth.js";
@@ -6,10 +5,11 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
 import sanitizeHtml from "sanitize-html";
+import { revalidateTag } from "next/cache.js";
 import {
 	revalidateProducts,
 	revalidateProductBySlug,
-} from "../../../lib/revalidation_actions.js";
+} from "../../../lib/revalidationActions.js";
 
 export const config = {
 	api: {
