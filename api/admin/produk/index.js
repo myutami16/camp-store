@@ -5,11 +5,7 @@ import { cloudinary } from "../../../lib/cloudinary.js";
 import Product from "../../../models/product.js";
 import fs from "fs";
 import sanitizeHtml from "sanitize-html";
-import { revalidateTag } from "next/cache.js";
-import {
-	revalidateProducts,
-	revalidateProductBySlug,
-} from "../../../lib/revalidationActions.js";
+import { revalidateViaRoute } from "../../../lib/revalidationActions.js";
 
 export const config = {
 	api: {
@@ -149,13 +145,8 @@ export const createProduct = async (req, res) => {
 				cloudinary_id: public_id,
 			});
 
-			// ✅ Enhanced revalidation after creating product
-			await revalidateProducts(); // Revalidate listing and all detail pages
-
-			// ✅ Also revalidate the specific product detail page
-			if (product.slug) {
-				await revalidateProductBySlug(product.slug);
-			}
+			// ✅ Enhanced revalidation after creating product using route
+			await revalidateViaRoute(product.slug, product.kategori);
 
 			return res.status(201).json({
 				success: true,
@@ -203,8 +194,9 @@ export const updateProduct = async (req, res) => {
 			});
 		}
 
-		// Store old slug for revalidation
+		// Store old slug and category for revalidation
 		const oldSlug = product.slug;
+		const oldCategory = product.kategori;
 
 		let fields, files;
 		try {
@@ -296,22 +288,16 @@ export const updateProduct = async (req, res) => {
 				{ new: true, runValidators: true }
 			);
 
-			// ✅ Enhanced revalidation after updating product
-			await revalidateProducts(); // Revalidate listing and all detail pages
+			// ✅ Enhanced revalidation after updating product using route
+			// Revalidate old slug and category
+			await revalidateViaRoute(oldSlug, oldCategory);
 
-			// ✅ Revalidate old slug if it exists
-			if (oldSlug) {
-				await revalidateProductBySlug(oldSlug);
-			}
-
-			// ✅ Revalidate new slug if it changed
-			if (updatedProduct.slug && updatedProduct.slug !== oldSlug) {
-				await revalidateProductBySlug(updatedProduct.slug);
-			}
-
-			// ✅ If slug didn't change, still revalidate the current slug
-			if (updatedProduct.slug && updatedProduct.slug === oldSlug) {
-				await revalidateProductBySlug(updatedProduct.slug);
+			// Revalidate new slug and category if they changed
+			if (
+				updatedProduct.slug !== oldSlug ||
+				updatedProduct.kategori !== oldCategory
+			) {
+				await revalidateViaRoute(updatedProduct.slug, updatedProduct.kategori);
 			}
 
 			return res.status(200).json({
@@ -364,21 +350,8 @@ export const deleteProduct = async (req, res) => {
 
 		await Product.findByIdAndDelete(req.query.id);
 
-		// ✅ Enhanced revalidation after deleting product
-		await revalidateProducts(); // Revalidate listing and all detail pages
-
-		// ✅ Revalidate specific product page if slug exists
-		if (productSlug) {
-			await revalidateProductBySlug(productSlug);
-		}
-
-		// ✅ Additional revalidation for category if needed
-		if (productCategory) {
-			// You can add category-specific revalidation here
-			revalidateTag(
-				`category-${productCategory.toLowerCase().replace(/\s+/g, "-")}`
-			);
-		}
+		// ✅ Enhanced revalidation after deleting product using route
+		await revalidateViaRoute(productSlug, productCategory);
 
 		return res.status(200).json({
 			success: true,
@@ -528,7 +501,6 @@ export default async function handler(req, res) {
 
 		if (req.method === "OPTIONS") {
 			res.status(200).end();
-			return;
 		}
 
 		switch (req.method) {
