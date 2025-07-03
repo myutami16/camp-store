@@ -501,37 +501,39 @@ export default async function handler(req, res) {
 
 		if (req.method === "OPTIONS") {
 			res.status(200).end();
+			return; 
 		}
 
 		switch (req.method) {
 			case "GET":
 				if (req.query.id) {
-					await getProductById(req, res);
+					return await getProductById(req, res); 
 				} else {
-					await getAllProducts(req, res);
+					return await getAllProducts(req, res); 
 				}
-				break;
 			case "POST":
-				await createProduct(req, res);
-				break;
+				return await createProduct(req, res); 
 			case "PUT":
-				await updateProduct(req, res);
-				break;
+				return await updateProduct(req, res); 
 			case "DELETE":
-				await deleteProduct(req, res);
-				break;
+				return await deleteProduct(req, res); /
 			default:
-				res.status(405).json({
+				return res.status(405).json({
+					
 					success: false,
 					message: `Method ${req.method} Not Allowed`,
 				});
 		}
 	} catch (error) {
 		console.error("API Error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Internal Server Error",
-			error: process.env.NODE_ENV === "development" ? error.message : undefined,
-		});
+		
+		if (!res.headersSent) {
+			res.status(500).json({
+				success: false,
+				message: "Internal Server Error",
+				error:
+					process.env.NODE_ENV === "development" ? error.message : undefined,
+			});
+		}
 	}
 }
