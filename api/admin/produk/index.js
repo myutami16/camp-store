@@ -501,32 +501,32 @@ export default async function handler(req, res) {
 
 		if (req.method === "OPTIONS") {
 			res.status(200).end();
-			return; 
+			return; // ✅ FIXED: Added return statement
 		}
 
 		switch (req.method) {
 			case "GET":
 				if (req.query.id) {
-					return await getProductById(req, res); 
+					return await getProductById(req, res); // ✅ FIXED: Added return
 				} else {
-					return await getAllProducts(req, res); 
+					return await getAllProducts(req, res); // ✅ FIXED: Added return
 				}
 			case "POST":
-				return await createProduct(req, res); 
+				return await createProduct(req, res); // ✅ FIXED: Added return
 			case "PUT":
-				return await updateProduct(req, res); 
+				return await updateProduct(req, res); // ✅ FIXED: Added return
 			case "DELETE":
-				return await deleteProduct(req, res); /
+				return await deleteProduct(req, res); // ✅ FIXED: Added return
 			default:
 				return res.status(405).json({
-					
+					// ✅ FIXED: Added return
 					success: false,
 					message: `Method ${req.method} Not Allowed`,
 				});
 		}
 	} catch (error) {
 		console.error("API Error:", error);
-		
+		// ✅ FIXED: Check if headers already sent
 		if (!res.headersSent) {
 			res.status(500).json({
 				success: false,
