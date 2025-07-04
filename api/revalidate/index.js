@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
 		console.log("🔄 Revalidating with slug:", slug, "category:", category);
 
-		// ✅ Pages Router: Use res.revalidate() for on-demand revalidation
+		// ✅ Pages Router: Trigger fresh fetch for cached pages
 		const pathsToRevalidate = [
 			"/produk", // Main products page
 		];
@@ -35,18 +35,29 @@ export default async function handler(req, res) {
 			pathsToRevalidate.push(`/produk/${slug}`);
 		}
 
-		// Revalidate all paths
+		// ✅ Make HEAD requests to trigger ISR revalidation
+		const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
+
 		for (const path of pathsToRevalidate) {
 			try {
-				await res.revalidate(path);
-				console.log(`✅ Revalidated: ${path}`);
+				const fullUrl = `${baseUrl}${path}`;
+				const response = await fetch(fullUrl, {
+					method: "HEAD",
+					headers: {
+						"Cache-Control": "no-cache",
+						Pragma: "no-cache",
+					},
+				});
+				console.log(
+					`✅ Triggered ISR revalidation for: ${path} (${response.status})`
+				);
 			} catch (err) {
-				console.error(`❌ Failed to revalidate ${path}:`, err);
+				console.error(`❌ Failed to trigger revalidation for ${path}:`, err);
 				// Continue with other paths even if one fails
 			}
 		}
 
-		console.log("✅ Revalidation completed successfully");
+		console.log("✅ Revalidation process completed successfully");
 		return res.status(200).json({ success: true });
 	} catch (error) {
 		console.error("❌ Error in revalidation route:", error);
