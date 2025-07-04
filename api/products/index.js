@@ -114,70 +114,20 @@ export const getCategories = async (req, res) => {
 	}
 };
 
-// Helper function to generate cache tags based on request parameters
-const generateCacheTags = (req) => {
-	const tags = ["products"];
-
-	// Add category-specific tags
-	if (req.query.kategori) {
-		const categorySlug = req.query.kategori.toLowerCase().replace(/\s+/g, "-");
-		tags.push(`category-${categorySlug}`);
-		tags.push("filtered-products");
-	} else {
-		tags.push("all-products");
-	}
-
-	// Add search-specific tags
-	if (req.query.search || req.query.q) {
-		tags.push("search-products");
-	}
-
-	// Add filter-specific tags
-	if (req.query.isForRent === "true") {
-		tags.push("rent-products");
-	}
-
-	if (req.query.isForSale === "true") {
-		tags.push("sale-products");
-	}
-
-	// Add slug-specific tag
-	if (req.query.slug) {
-		tags.push(`product-${req.query.slug}`);
-		tags.push("product-by-slug");
-	}
-
-	// Add ID-specific tag
-	if (req.query.id) {
-		tags.push(`product-id-${req.query.id}`);
-		tags.push("product-by-id");
-	}
-
-	// Add categories tag
-	if (req.query.path === "categories") {
-		tags.push("categories");
-	}
-
-	return tags;
-};
-
-// Helper function to set cache headers with specific tags
+// Updated cache headers function for Pages Router
 const setCacheHeaders = (res, req) => {
-	const tags = generateCacheTags(req);
-
-	// Set cache control with tags support
+	// Set cache control for 1 hour with stale-while-revalidate
 	res.setHeader(
 		"Cache-Control",
 		"public, s-maxage=3600, stale-while-revalidate=86400"
 	);
 
-	// Set cache tags for edge caching and revalidation
-	if (tags.length > 0) {
-		res.setHeader("Cache-Tags", tags.join(","));
-	}
-
 	// Set vary header for different query parameters
 	res.setHeader("Vary", "Accept, User-Agent, Accept-Encoding");
+
+	// Add ETag for better caching
+	const etag = `W/"${Date.now()}"`;
+	res.setHeader("ETag", etag);
 };
 
 // Main handler function for API routes
@@ -199,7 +149,7 @@ export default async function handler(req, res) {
 	}
 
 	if (req.method === "GET") {
-		// ✅ Enhanced cache headers with specific tags based on request
+		// Set cache headers for 1 hour minimum
 		setCacheHeaders(res, req);
 
 		await connectDB();
