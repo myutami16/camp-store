@@ -119,7 +119,7 @@ const setCacheHeaders = (res, req) => {
 	// Set cache control for 1 hour with stale-while-revalidate
 	res.setHeader(
 		"Cache-Control",
-		"public, s-maxage=3600, stale-while-revalidate=86400"
+		"public, s-maxage=300, stale-while-revalidate=1800"
 	);
 
 	// Set vary header for different query parameters
